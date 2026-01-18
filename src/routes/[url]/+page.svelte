@@ -7,7 +7,7 @@
 
 	let videoId = $page.url.searchParams.get('v') as string; 
 	
-	const API_BASE = "yt-api-worker.cloudflare-473.workers.dev"
+	const API_BASE = "https://yt-api-worker.cloudflare-473.workers.dev"
 
 	const query = createQuery({
 		queryKey: ['snippet', videoId],
