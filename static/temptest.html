@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube Silence Skipper</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 900px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        
+        h1 {
+            color: #333;
+        }
+        
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        
+        button {
+            padding: 12px 24px;
+            font-size: 16px;
+            cursor: pointer;
+            background: #ff0000;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            margin: 5px;
+            transition: background 0.3s;
+        }
+        
+        button:hover:not(:disabled) {
+            background: #cc0000;
+        }
+        
+        button:disabled {
+            background: #999;
+            cursor: not-allowed;
+        }
+        
+        .active {
+            background: #4CAF50 !important;
+        }
+        
+        .active:hover {
+            background: #45a049 !important;
+        }
+        
+        input[type="text"] {
+            width: 100%;
+            padding: 10px;
+            font-size: 16px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-bottom: 10px;
+        }
+        
+        .settings {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .setting-item label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+        
+        .setting-item input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        
+        #status {
+            background: #f0f0f0;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 20px 0;
+            border-left: 4px solid #ff0000;
+        }
+        
+        #silentPeriods {
+            max-height: 250px;
+            overflow-y: auto;
+            background: #fafafa;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+
+        #transcript {
+            max-height: 300px;
+            overflow-y: auto;
+            background: #fafafa;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        
+        .silence-item {
+            padding: 8px;
+            margin: 5px 0;
+            background: white;
+            border-left: 3px solid #ff0000;
+            padding-left: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-radius: 2px;
+        }
+        
+        .silence-item:hover {
+            background: #f9f9f9;
+        }
+        
+        .skip-btn {
+            padding: 4px 12px;
+            font-size: 12px;
+            margin: 0;
+        }
+
+        .transcript-line {
+            padding: 8px;
+            margin: 6px 0;
+            background: white;
+            border-left: 3px solid #667eea;
+            padding-left: 12px;
+            border-radius: 2px;
+        }
+
+        .transcript-time {
+            font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+            font-size: 12px;
+            color: #555;
+            display: inline-block;
+            min-width: 90px;
+        }
+
+        .transcript-text {
+            color: #222;
+        }
+        
+        #stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-top: 15px;
+        }
+        
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px;
+            border-radius: 4px;
+            text-align: center;
+        }
+        
+        .stat-card h3 {
+            margin: 0 0 5px 0;
+            font-size: 24px;
+        }
+        
+        .stat-card p {
+            margin: 0;
+            font-size: 12px;
+            opacity: 0.9;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎬 YouTube Silence Skipper</h1>
+    <p style="color: #666;">Automatically skip silent parts in YouTube videos using transcripts - no permissions needed!</p>
+    
+    <div class="container">
+        <h3>Video URL</h3>
+        <input type="text" id="videoUrl" placeholder="Paste YouTube URL here (e.g., https://www.youtube.com/watch?v=VIDEO_ID)">
+        <button id="loadBtn">Load Video</button>
+    </div>
+    
+    <div class="container">
+        <h3>Settings</h3>
+        <div class="settings">
+            <div class="setting-item">
+                <label>Minimum Gap (seconds):</label>
+                <input type="number" id="minGap" min="1" max="20" step="0.5" value="3">
+            </div>
+            <div class="setting-item">
+                <label>Skip Buffer (seconds):</label>
+                <input type="number" id="skipBuffer" min="0" max="5" step="0.5" value="0.5">
+                <small style="color: #666;">Jump ahead by this much extra</small>
+            </div>
+        </div>
+        
+        <button id="analyzeBtn" disabled>Analyze Transcript</button>
+        <button id="toggleSkip" disabled>Enable Auto-Skip</button>
+    </div>
+    
+    <div class="container">
+        <div id="status">
+            <strong>Status:</strong> Paste a YouTube URL to begin
+        </div>
+        
+        <div id="stats" style="display: none;"></div>
+        
+        <div id="silentPeriods"></div>
+    </div>
+
+    <div class="container">
+        <h3>Transcript</h3>
+        <div id="transcript"></div>
+    </div>
+    
+    <div class="container">
+        <div id="player"></div>
+    </div>
+
+    <script>
+        let player;
+        let silentPeriods = [];
+        let autoSkipEnabled = false;
+        let checkInterval;
+        let cachedTranscript = [];
+
+        const API_BASE = 'http://127.0.0.1:5000';
+        
+        // Extract video ID from URL
+        function extractVideoId(url) {
+            const patterns = [
+                /(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\n?#]+)/,
+                /youtube\.com\/embed\/([^&\n?#]+)/,
+            ];
+            
+            for (let pattern of patterns) {
+                const match = url.match(pattern);
+                if (match) return match[1];
+            }
+            return null;
+        }
+        
+        // Load YouTube API
+        const tag = document.createElement('script');
+        tag.src = "https://www.youtube.com/iframe_api";
+        document.head.appendChild(tag);
+        
+        let playerReady = false;
+        
+        function onYouTubeIframeAPIReady() {
+            // Initial empty player
+            player = new YT.Player('player', {
+                height: '480',
+                width: '100%',
+                playerVars: {
+                    'playsinline': 1,
+                    'enablejsapi': 1
+                },
+                events: {
+                    'onReady': () => {
+                        playerReady = true;
+                        updateStatus('Ready! Paste a YouTube URL above.');
+                    }
+                }
+            });
+        }
+        
+        // Load video button
+        document.getElementById('loadBtn').addEventListener('click', () => {
+            const url = document.getElementById('videoUrl').value;
+            const videoId = extractVideoId(url);
+            
+            if (!videoId) {
+                updateStatus('❌ Invalid YouTube URL');
+                return;
+            }
+            
+            updateStatus('Loading video...');
+            
+            if (playerReady) {
+                player.loadVideoById(videoId);
+                document.getElementById('analyzeBtn').disabled = false;
+                updateStatus(`✅ Video loaded! Click "Analyze Transcript" to detect silence.`);
+                
+                // Reset previous analysis
+                silentPeriods = [];
+                autoSkipEnabled = false;
+                document.getElementById('toggleSkip').disabled = true;
+                document.getElementById('toggleSkip').classList.remove('active');
+                document.getElementById('toggleSkip').textContent = 'Enable Auto-Skip';
+                document.getElementById('silentPeriods').innerHTML = '';
+                document.getElementById('transcript').innerHTML = '';
+                document.getElementById('stats').style.display = 'none';
+                stopMonitoring();
+            }
+        });
+        
+        // Analyze button
+        document.getElementById('analyzeBtn').addEventListener('click', async () => {
+            if (!player || !player.getVideoData) {
+                updateStatus('❌ Player not ready yet. Try again in a moment.');
+                return;
+            }
+
+            const videoId = player.getVideoData().video_id;
+            if (!videoId) {
+                updateStatus('❌ No video loaded. Paste a URL and load it first.');
+                return;
+            }
+            const minGap = parseFloat(document.getElementById('minGap').value);
+            
+            updateStatus('📥 Fetching transcript...');
+            
+            try {
+                const transcript = await fetchTranscript(videoId);
+                
+                if (!transcript || transcript.length === 0) {
+                    updateStatus('❌ No transcript available for this video');
+                    return;
+                }
+
+                cachedTranscript = transcript;
+                displayTranscript(transcript);
+                
+                updateStatus('🔍 Analyzing for silence...');
+                
+                // Find silent periods
+                silentPeriods = findSilentPeriods(transcript, minGap);
+                
+                const totalSilence = silentPeriods.reduce((sum, p) => sum + p.duration, 0);
+                
+                updateStatus(`✅ Analysis complete! Found ${silentPeriods.length} silent periods (${totalSilence.toFixed(1)}s total)`);
+                
+                // Show stats
+                displayStats(silentPeriods, totalSilence);
+                
+                // Display silent periods
+                displaySilentPeriods(silentPeriods);
+                
+                if (silentPeriods.length > 0) {
+                    document.getElementById('toggleSkip').disabled = false;
+                    // Auto-enable skip
+                    if (!autoSkipEnabled) {
+                        autoSkipEnabled = true;
+                        const btn = document.getElementById('toggleSkip');
+                        btn.textContent = '✓ Auto-Skip Enabled';
+                        btn.classList.add('active');
+                        startMonitoring();
+                        updateStatus(`✅ Found ${silentPeriods.length} silent periods - auto-skip enabled!`);
+                    }
+                } else {
+                    document.getElementById('silentPeriods').innerHTML = '<p style="text-align: center; color: #666;">✨ No significant silent periods found in this video!</p>';
+                }
+                
+            } catch (err) {
+                console.error(err);
+                updateStatus(`❌ Error: ${err.message}`);
+            }
+        });
+        
+        async function fetchTranscript(videoId) {
+            const endpoint = `${API_BASE}/transcript/${encodeURIComponent(videoId)}`;
+            console.log('Fetching transcript from:', endpoint);
+
+            const response = await fetch(endpoint, {
+                headers: { 'Accept': 'application/json' }
+            });
+
+            const text = await response.text();
+            console.log('Raw response:', text.substring(0, 500));
+            
+            let payload;
+            try {
+                payload = JSON.parse(text);
+            } catch (e) {
+                console.error('JSON parse error:', e);
+                throw new Error('Invalid JSON response from transcript API');
+            }
+            
+            console.log('Parsed payload keys:', Object.keys(payload || {}));
+            console.log('snippets length:', payload?.snippets?.length);
+
+            if (!response.ok) {
+                const message = payload?.error || `Transcript request failed (${response.status})`;
+                throw new Error(message);
+            }
+
+            const transcript = normalizeTranscript(payload);
+            console.log('Normalized transcript length:', transcript.length);
+
+            if (transcript.length === 0) {
+                throw new Error('Transcript response was empty');
+            }
+
+            return transcript;
+        }
+
+        function normalizeTranscript(payload) {
+            const raw =
+                (Array.isArray(payload) && payload) ||
+                payload?.snippets ||
+                payload?.transcript ||
+                payload?.segments ||
+                payload?.items ||
+                [];
+
+            return raw
+                .map((item) => ({
+                    text: item.text || item.content || item.caption || '',
+                    start: Number(item.start ?? item.startTime ?? item.offset ?? 0),
+                    duration: Number(item.duration ?? item.dur ?? item.length ?? 0),
+                }))
+                .filter((item) => item.text.trim().length > 0)
+                .sort((a, b) => a.start - b.start);
+        }
+        
+        function findSilentPeriods(transcript, minGap) {
+            const periods = [];
+            
+            for (let i = 0; i < transcript.length - 1; i++) {
+                const currentEnd = transcript[i].start + transcript[i].duration;
+                const nextStart = transcript[i + 1].start;
+                const gap = nextStart - currentEnd;
+                
+                if (gap >= minGap) {
+                    periods.push({
+                        start: currentEnd,
+                        end: nextStart,
+                        duration: gap,
+                        index: periods.length
+                    });
+                }
+            }
+            
+            return periods;
+        }
+        
+        function displayStats(periods, totalSilence) {
+            const videoDuration = player.getDuration();
+            const silencePercent = (totalSilence / videoDuration * 100).toFixed(1);
+            const avgGap = periods.length > 0 ? (totalSilence / periods.length).toFixed(1) : 0;
+            
+            document.getElementById('stats').style.display = 'grid';
+            document.getElementById('stats').innerHTML = `
+                <div class="stat-card">
+                    <h3>${periods.length}</h3>
+                    <p>Silent Periods</p>
+                </div>
+                <div class="stat-card">
+                    <h3>${totalSilence.toFixed(1)}s</h3>
+                    <p>Total Silence (${silencePercent}%)</p>
+                </div>
+                <div class="stat-card">
+                    <h3>${avgGap}s</h3>
+                    <p>Average Gap</p>
+                </div>
+            `;
+        }
+        
+        function displaySilentPeriods(periods) {
+            const periodsDiv = document.getElementById('silentPeriods');
+            
+            if (periods.length === 0) return;
+            
+            periodsDiv.innerHTML = '<h4>Silent Periods Found:</h4>' + 
+                periods.map(p => 
+                    `<div class="silence-item">
+                        <span>
+                            <strong>${formatTime(p.start)}</strong> → <strong>${formatTime(p.end)}</strong>
+                            <span style="color: #666;">(${p.duration.toFixed(1)}s)</span>
+                        </span>
+                        <button class="skip-btn" onclick="skipToTime(${p.end})">Skip Now</button>
+                    </div>`
+                ).join('');
+        }
+
+        function displayTranscript(transcript) {
+            const transcriptDiv = document.getElementById('transcript');
+
+            if (!transcript || transcript.length === 0) {
+                transcriptDiv.innerHTML = '<p style="text-align: center; color: #666;">No transcript lines to display.</p>';
+                return;
+            }
+
+            transcriptDiv.innerHTML = transcript
+                .map(line => {
+                    const start = formatTime(line.start);
+                    const end = formatTime(line.start + line.duration);
+                    return `
+                        <div class="transcript-line">
+                            <span class="transcript-time">${start} → ${end}</span>
+                            <span class="transcript-text">${escapeHtml(line.text)}</span>
+                        </div>
+                    `;
+                })
+                .join('');
+        }
+        
+        function skipToTime(time) {
+            player.seekTo(time, true);
+            updateStatus(`⏭️ Jumped to ${formatTime(time)}`);
+        }
+        
+        // Toggle auto-skip
+        document.getElementById('toggleSkip').addEventListener('click', () => {
+            autoSkipEnabled = !autoSkipEnabled;
+            const btn = document.getElementById('toggleSkip');
+            
+            if (autoSkipEnabled) {
+                btn.textContent = '✓ Auto-Skip Enabled';
+                btn.classList.add('active');
+                updateStatus('✅ Auto-skip enabled - watching for silence...');
+                startMonitoring();
+            } else {
+                btn.textContent = 'Enable Auto-Skip';
+                btn.classList.remove('active');
+                updateStatus('Auto-skip disabled');
+                stopMonitoring();
+            }
+        });
+        
+        function startMonitoring() {
+            checkInterval = setInterval(() => {
+                if (!player || !player.getCurrentTime) return;
+                
+                const current = player.getCurrentTime();
+                const buffer = parseFloat(document.getElementById('skipBuffer').value);
+                
+                // Check if we're in a silent period
+                for (let period of silentPeriods) {
+                    if (current >= period.start && current < period.end) {
+                        const skipTo = period.end + buffer;
+                        console.log(`Skipping silence: ${period.start.toFixed(1)} -> ${skipTo.toFixed(1)}`);
+                        player.seekTo(skipTo, true);
+                        updateStatus(`⏭️ Skipped ${period.duration.toFixed(1)}s of silence`);
+                        break;
+                    }
+                }
+            }, 500); // Check twice per second
+        }
+        
+        function stopMonitoring() {
+            if (checkInterval) {
+                clearInterval(checkInterval);
+                checkInterval = null;
+            }
+        }
+        
+        function updateStatus(message) {
+            document.getElementById('status').innerHTML = `<strong>Status:</strong> ${message}`;
+        }
+        
+        function formatTime(seconds) {
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            return `${mins}:${secs.toString().padStart(2, '0')}`;
+        }
+
+        function escapeHtml(text) {
+            const map = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#39;',
+            };
+            return text.replace(/[&<>"']/g, (char) => map[char]);
+        }
+    </script>
+</body>
+</html>

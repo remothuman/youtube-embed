@@ -1,0 +1,3 @@
+
+- can make it cache silence timestamps indefinitly based on videoId x videolength (cause they do get edited sometimes)
+- can make it output it as json timestamps to frontend and use iframe messages to skip over silent parts

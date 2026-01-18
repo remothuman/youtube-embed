@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Silence Skipper Player</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0f0f0f;
+      color: #fff;
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      font-size: 1.4rem;
+      margin-bottom: 20px;
+      color: #fff;
+    }
+
+    .video-wrapper {
+      position: relative;
+      padding-bottom: 56.25%;
+      height: 0;
+      background: #000;
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .video-wrapper iframe {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    .controls {
+      margin-top: 20px;
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    button {
+      background: #272727;
+      color: #fff;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 20px;
+      cursor: pointer;
+      font-size: 14px;
+      transition: background 0.2s;
+    }
+
+    button:hover {
+      background: #3a3a3a;
+    }
+
+    button.active {
+      background: #3ea6ff;
+      color: #0f0f0f;
+    }
+
+    .mode-toggle {
+      display: flex;
+      background: #1a1a1a;
+      border-radius: 20px;
+      overflow: hidden;
+    }
+
+    .mode-toggle button {
+      border-radius: 0;
+      padding: 10px 16px;
+    }
+
+    .mode-toggle button:first-child {
+      border-radius: 20px 0 0 20px;
+    }
+
+    .mode-toggle button:last-child {
+      border-radius: 0 20px 20px 0;
+    }
+
+    .status {
+      font-size: 14px;
+      color: #aaa;
+      padding: 8px 16px;
+      background: #1a1a1a;
+      border-radius: 8px;
+    }
+
+    .timeline-container {
+      margin-top: 24px;
+    }
+
+    .timeline-label {
+      font-size: 13px;
+      color: #aaa;
+      margin-bottom: 8px;
+    }
+
+    .timeline {
+      position: relative;
+      height: 40px;
+      background: #272727;
+      border-radius: 8px;
+      overflow: hidden;
+      cursor: pointer;
+    }
+
+    .silence-marker {
+      position: absolute;
+      top: 0;
+      height: 100%;
+      background: rgba(255, 100, 100, 0.5);
+      pointer-events: none;
+    }
+
+    .playhead {
+      position: absolute;
+      top: 0;
+      width: 3px;
+      height: 100%;
+      background: #fff;
+      pointer-events: none;
+      transition: left 0.1s linear;
+    }
+
+    .stats {
+      margin-top: 24px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 12px;
+    }
+
+    .stat-card {
+      background: #1a1a1a;
+      padding: 16px;
+      border-radius: 12px;
+    }
+
+    .stat-value {
+      font-size: 1.5rem;
+      font-weight: 600;
+      color: #3ea6ff;
+    }
+
+    .stat-label {
+      font-size: 12px;
+      color: #888;
+      margin-top: 4px;
+    }
+
+    .segment-list {
+      margin-top: 24px;
+      max-height: 300px;
+      overflow-y: auto;
+      background: #1a1a1a;
+      border-radius: 12px;
+      padding: 12px;
+    }
+
+    .segment-list h3 {
+      font-size: 14px;
+      color: #aaa;
+      margin-bottom: 12px;
+    }
+
+    .segment-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 12px;
+      background: #272727;
+      border-radius: 8px;
+      margin-bottom: 8px;
+      font-size: 13px;
+    }
+
+    .segment-item:last-child {
+      margin-bottom: 0;
+    }
+
+    .segment-item.active {
+      background: rgba(255, 100, 100, 0.3);
+      border: 1px solid rgba(255, 100, 100, 0.5);
+    }
+
+    .segment-time {
+      color: #3ea6ff;
+      cursor: pointer;
+    }
+
+    .segment-time:hover {
+      text-decoration: underline;
+    }
+
+    .segment-duration {
+      color: #888;
+    }
+
+    .min-duration-control {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: #1a1a1a;
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-size: 14px;
+    }
+
+    .min-duration-control label {
+      color: #aaa;
+      white-space: nowrap;
+    }
+
+    .min-duration-control input {
+      width: 70px;
+      background: #272727;
+      border: 1px solid #3a3a3a;
+      border-radius: 8px;
+      color: #fff;
+      padding: 6px 10px;
+      font-size: 14px;
+      text-align: center;
+    }
+
+    .min-duration-control input:focus {
+      outline: none;
+      border-color: #3ea6ff;
+    }
+
+    .min-duration-control span {
+      color: #888;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Lupe Fiasco - Rap Theory & Practice: an Introduction</h1>
+    
+    <div class="video-wrapper">
+      <div id="player"></div>
+    </div>
+
+    <div class="controls">
+      <button id="enableToggle" class="active">Silence Skip: ON</button>
+      <div class="mode-toggle">
+        <button id="modeSkip" class="active">Skip</button>
+        <button id="modeSpeed">Speed</button>
+      </div>
+      <button id="prevSilence">← Prev</button>
+      <button id="nextSilence">Next →</button>
+      <div class="min-duration-control">
+        <label for="minDuration">Min:</label>
+        <input type="number" id="minDuration" value="500" min="0" step="100">
+        <span>ms</span>
+      </div>
+      <div class="min-duration-control">
+        <label for="leadIn">Lead-in:</label>
+        <input type="number" id="leadIn" value="100" min="0" step="50">
+        <span>ms</span>
+      </div>
+      <div class="min-duration-control">
+        <label for="silenceSpeed">Speed:</label>
+        <input type="number" id="silenceSpeed" value="2" min="1" max="2" step="0.25">
+        <span>x</span>
+      </div>
+      <div class="status" id="status">Ready</div>
+    </div>
+
+    <div class="timeline-container">
+      <div class="timeline-label">Timeline (red = silence segments)</div>
+      <div class="timeline" id="timeline">
+        <div class="playhead" id="playhead"></div>
+      </div>
+    </div>
+
+    <div class="stats">
+      <div class="stat-card">
+        <div class="stat-value" id="originalDuration">0:00</div>
+        <div class="stat-label">Original</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="effectiveDuration">0:00</div>
+        <div class="stat-label">Effective (skip)</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="effectiveDurationSpeed">0:00</div>
+        <div class="stat-label">Effective (speed)</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="totalSilence">0s</div>
+        <div class="stat-label">Total Silence</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="segmentCount">0</div>
+        <div class="stat-label">Segments</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="currentTime">0:00</div>
+        <div class="stat-label">Current Time</div>
+      </div>
+    </div>
+
+    <div class="segment-list">
+      <h3>Silence Segments (click to jump)</h3>
+      <div id="segmentListContent"></div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { VIDEO_ID, DURATION_SECONDS, SILENCE_SEGMENTS } from './player.js';
+
+    let player;
+    let enabled = true;
+    let mode = 'skip'; // 'skip' or 'speed'
+    let checkInterval;
+    let minDuration = 500;
+    let leadIn = 100;
+    let silenceSpeed = 2; // YouTube API max is 2x
+    let normalSpeed = 1;
+    let inSilence = false;
+
+    // Get segments filtered by minimum duration
+    function getFilteredSegments() {
+      return SILENCE_SEGMENTS.filter(s => s.duration_ms >= minDuration);
+    }
+
+    // Format time helper
+    function formatTime(seconds) {
+      const hrs = Math.floor(seconds / 3600);
+      const mins = Math.floor((seconds % 3600) / 60);
+      const secs = Math.floor(seconds % 60);
+      if (hrs > 0) {
+        return `${hrs}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+      }
+      return `${mins}:${secs.toString().padStart(2, '0')}`;
+    }
+
+    function formatMs(ms) {
+      return formatTime(ms / 1000);
+    }
+
+    // Initialize YouTube API
+    const tag = document.createElement('script');
+    tag.src = 'https://www.youtube.com/iframe_api';
+    const firstScriptTag = document.getElementsByTagName('script')[0];
+    firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+
+    // Expose to window for YouTube API callback
+    window.onYouTubeIframeAPIReady = function() {
+      player = new YT.Player('player', {
+        videoId: VIDEO_ID,
+        playerVars: {
+          autoplay: 0,
+          modestbranding: 1,
+          rel: 0
+        },
+        events: {
+          onReady: onPlayerReady,
+          onStateChange: onPlayerStateChange
+        }
+      });
+    }
+
+    function onPlayerReady(event) {
+      updateStats();
+      renderTimeline();
+      initTimelineClick();
+      renderSegmentList();
+      startTimeCheck();
+    }
+
+    function onPlayerStateChange(event) {
+      if (event.data === YT.PlayerState.PLAYING) {
+        startTimeCheck();
+      } else {
+        stopTimeCheck();
+      }
+    }
+
+    function startTimeCheck() {
+      stopTimeCheck();
+      checkInterval = setInterval(checkSilence, 100);
+    }
+
+    function stopTimeCheck() {
+      if (checkInterval) {
+        clearInterval(checkInterval);
+        checkInterval = null;
+      }
+    }
+
+    function checkSilence() {
+      if (!player || typeof player.getCurrentTime !== 'function') return;
+      
+      const currentMs = player.getCurrentTime() * 1000;
+      updatePlayhead(currentMs);
+      updateCurrentTime(currentMs);
+      highlightActiveSegment(currentMs);
+
+      if (!enabled) {
+        // Ensure normal speed when disabled
+        if (inSilence) {
+          player.setPlaybackRate(normalSpeed);
+          inSilence = false;
+        }
+        return;
+      }
+
+      // Check if we're in a silence segment
+      let currentlyInSilence = false;
+      for (const segment of getFilteredSegments()) {
+        if (currentMs >= segment.start_ms && currentMs < segment.end_ms - leadIn) {
+          currentlyInSilence = true;
+          
+          if (mode === 'skip') {
+            // Skip mode: jump to end minus lead-in
+            const targetMs = segment.end_ms - leadIn;
+            const skipToMs = targetMs > segment.start_ms ? targetMs : segment.end_ms;
+            player.seekTo(skipToMs / 1000, true);
+            updateStatus(`Skipped silence at ${formatMs(segment.start_ms)}`);
+          } else {
+            // Speed mode: increase playback rate
+            if (!inSilence) {
+              normalSpeed = player.getPlaybackRate();
+              player.setPlaybackRate(silenceSpeed);
+              inSilence = true;
+              updateStatus(`Speeding through silence (${silenceSpeed}x)`);
+            }
+          }
+          break;
+        }
+      }
+
+      // Restore normal speed when exiting silence (speed mode)
+      if (!currentlyInSilence && inSilence) {
+        player.setPlaybackRate(normalSpeed);
+        inSilence = false;
+        updateStatus('Normal speed');
+      }
+    }
+
+    function updatePlayhead(currentMs) {
+      const percent = (currentMs / 1000 / DURATION_SECONDS) * 100;
+      document.getElementById('playhead').style.left = `${percent}%`;
+    }
+
+    function updateCurrentTime(currentMs) {
+      document.getElementById('currentTime').textContent = formatMs(currentMs);
+    }
+
+    function highlightActiveSegment(currentMs) {
+      const filtered = getFilteredSegments();
+      const items = document.querySelectorAll('.segment-item');
+      items.forEach((item, index) => {
+        const segment = filtered[index];
+        if (segment && currentMs >= segment.start_ms && currentMs < segment.end_ms) {
+          item.classList.add('active');
+        } else {
+          item.classList.remove('active');
+        }
+      });
+    }
+
+    function updateStatus(message) {
+      const status = document.getElementById('status');
+      status.textContent = message;
+      setTimeout(() => {
+        if (!enabled) {
+          status.textContent = 'Disabled';
+        } else {
+          status.textContent = mode === 'skip' ? 'Skip mode' : `Speed mode (${silenceSpeed}x)`;
+        }
+      }, 2000);
+    }
+
+    function updateStats() {
+      const filtered = getFilteredSegments();
+      const totalSilenceMs = filtered.reduce((sum, s) => sum + s.duration_ms, 0);
+      const totalSilenceSec = totalSilenceMs / 1000;
+      
+      // Original duration
+      document.getElementById('originalDuration').textContent = formatTime(DURATION_SECONDS);
+      
+      // Effective duration if skipping silence completely
+      const effectiveSkip = DURATION_SECONDS - totalSilenceSec;
+      document.getElementById('effectiveDuration').textContent = formatTime(effectiveSkip);
+      
+      // Effective duration if speeding through silence
+      const silenceAtSpeed = totalSilenceSec / silenceSpeed;
+      const effectiveSpeed = (DURATION_SECONDS - totalSilenceSec) + silenceAtSpeed;
+      document.getElementById('effectiveDurationSpeed').textContent = formatTime(effectiveSpeed);
+      
+      document.getElementById('totalSilence').textContent = `${Math.round(totalSilenceSec)}s`;
+      document.getElementById('segmentCount').textContent = filtered.length;
+    }
+
+    function renderTimeline() {
+      const timeline = document.getElementById('timeline');
+      
+      // Clear existing markers (keep playhead)
+      timeline.querySelectorAll('.silence-marker').forEach(m => m.remove());
+      
+      getFilteredSegments().forEach(segment => {
+        const marker = document.createElement('div');
+        marker.className = 'silence-marker';
+        const startPercent = (segment.start_ms / 1000 / DURATION_SECONDS) * 100;
+        const widthPercent = (segment.duration_ms / 1000 / DURATION_SECONDS) * 100;
+        marker.style.left = `${startPercent}%`;
+        marker.style.width = `${Math.max(widthPercent, 0.2)}%`;
+        timeline.appendChild(marker);
+      });
+    }
+
+    // Initialize timeline click handler (called once)
+    function initTimelineClick() {
+      const timeline = document.getElementById('timeline');
+      timeline.addEventListener('click', (e) => {
+        if (!player) return;
+        const rect = timeline.getBoundingClientRect();
+        const percent = (e.clientX - rect.left) / rect.width;
+        const seekTime = percent * DURATION_SECONDS;
+        player.seekTo(seekTime, true);
+      });
+    }
+
+    function renderSegmentList() {
+      const container = document.getElementById('segmentListContent');
+      container.innerHTML = getFilteredSegments().map((segment, index) => `
+        <div class="segment-item">
+          <span class="segment-time" onclick="seekTo(${segment.start_ms})">
+            ${formatMs(segment.start_ms)} → ${formatMs(segment.end_ms)}
+          </span>
+          <span class="segment-duration">${segment.duration_ms}ms</span>
+        </div>
+      `).join('');
+    }
+
+    function seekTo(ms) {
+      if (player) {
+        player.seekTo(ms / 1000, true);
+      }
+    }
+
+    // Button handlers
+    document.getElementById('enableToggle').addEventListener('click', function() {
+      enabled = !enabled;
+      this.textContent = `Silence Skip: ${enabled ? 'ON' : 'OFF'}`;
+      this.classList.toggle('active', enabled);
+      if (!enabled && inSilence) {
+        player.setPlaybackRate(normalSpeed);
+        inSilence = false;
+      }
+      updateStatus(enabled ? (mode === 'skip' ? 'Skip mode' : `Speed mode (${silenceSpeed}x)`) : 'Disabled');
+    });
+
+    document.getElementById('modeSkip').addEventListener('click', function() {
+      mode = 'skip';
+      this.classList.add('active');
+      document.getElementById('modeSpeed').classList.remove('active');
+      if (inSilence) {
+        player.setPlaybackRate(normalSpeed);
+        inSilence = false;
+      }
+      updateStatus('Skip mode');
+    });
+
+    document.getElementById('modeSpeed').addEventListener('click', function() {
+      mode = 'speed';
+      this.classList.add('active');
+      document.getElementById('modeSkip').classList.remove('active');
+      updateStatus(`Speed mode (${silenceSpeed}x)`);
+    });
+
+    document.getElementById('prevSilence').addEventListener('click', () => {
+      if (!player) return;
+      const filtered = getFilteredSegments();
+      const currentMs = player.getCurrentTime() * 1000;
+      for (let i = filtered.length - 1; i >= 0; i--) {
+        if (filtered[i].start_ms < currentMs - 1000) {
+          player.seekTo(filtered[i].start_ms / 1000, true);
+          return;
+        }
+      }
+    });
+
+    document.getElementById('nextSilence').addEventListener('click', () => {
+      if (!player) return;
+      const filtered = getFilteredSegments();
+      const currentMs = player.getCurrentTime() * 1000;
+      for (const segment of filtered) {
+        if (segment.start_ms > currentMs) {
+          player.seekTo(segment.start_ms / 1000, true);
+          return;
+        }
+      }
+    });
+
+    // Min duration input handler
+    document.getElementById('minDuration').addEventListener('input', function() {
+      minDuration = parseInt(this.value) || 0;
+      updateStats();
+      renderTimeline();
+      renderSegmentList();
+      updateStatus(`Min duration: ${minDuration}ms`);
+    });
+
+    document.getElementById('leadIn').addEventListener('input', function() {
+      leadIn = parseInt(this.value) || 0;
+      updateStatus(`Lead-in: ${leadIn}ms`);
+    });
+
+    document.getElementById('silenceSpeed').addEventListener('input', function() {
+      silenceSpeed = Math.min(2, Math.max(1, parseFloat(this.value) || 2)); // YouTube max is 2x
+      updateStats(); // Update effective duration calculation
+      if (inSilence) {
+        player.setPlaybackRate(silenceSpeed);
+      }
+      updateStatus(`Silence speed: ${silenceSpeed}x`);
+    });
+  </script>
+</body>
+</html>

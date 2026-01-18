@@ -16,10 +16,12 @@ export default {
 		// CORS
 		const corsResponse = handleCORS(request);
 		if (corsResponse) { return corsResponse; }
-		
+
 		const url = new URL(request.url);
 		const params = url.searchParams;
-		// only support one endpoint for now
+
+		// Main API wrapper
+		// video endpoint (snippet)
 		if (url.pathname != '/videos' && params.get('part') != 'snippet') {
 			return withCors(new Response('Only support /videos?part=snippet', { status: 400 }));
 		}
@@ -27,7 +29,7 @@ export default {
 		if (!id) {
 			return withCors(new Response('No id provided', { status: 400 }));
 		}
-		
+
 		const API_BASE = "https://www.googleapis.com/youtube/v3/"
 		const API_KEY = env.YT_API_KEY;
 		if (!API_KEY) {
@@ -35,7 +37,7 @@ export default {
 		}
 		const apiResponse = await fetch(`${API_BASE}videos?part=snippet&id=${id}&key=${env.YT_API_KEY}`);
 		return withCors(apiResponse);
-	
+
 	},
 } satisfies ExportedHandler<Env>;
 
