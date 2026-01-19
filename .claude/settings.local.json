@@ -2,7 +2,12 @@
   "permissions": {
     "allow": [
       "WebFetch(domain:www.viewstats.com)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(# Get the video page chunk curl -s \"\"https://www.viewstats.com/_next/static/chunks/app/\\(home\\)/%5BchannelHandle%5D/videos/%5BvideoId%5D/page-ecd43917f333eb24.js\"\" wc -c /tmp/video-page.js # Search for API-related patterns grep -oE ''\\(fetch|api|thumbnail|title|history|test|baseUrl|BASE_URL|endpoint\\)[A-Za-z0-9/\"\"''\\\\''''_.-]*'' /tmp/video-page.js)",
+      "Bash(# Download and search large chunks for viewstats backend curl -s \"\"https://www.viewstats.com/_next/static/chunks/36204-3fc01e07eba3982b.js\"\" curl -s \"\"https://www.viewstats.com/_next/static/chunks/49686-d668708c1a3bd1f3.js\"\" # Search for backend URL patterns grep -oE ''https://[a-z0-9.-]+viewstats[^\"\"''\\\\'''']*'' /tmp/chunk1.js /tmp/chunk2.js)",
+      "Bash(done)",
+      "Bash(xargs -I{} curl -s \"https://www.viewstats.com/_next/static/chunks/{}\")",
+      "Bash(# Download and analyze the abTest chunk more thoroughly curl -s \"\"https://www.viewstats.com/_next/static/chunks/47704-1c0d68eb3e979bd7.js\"\" wc -c /tmp/abtest-chunk.js # Find all abTest related patterns grep -oE ''.{0,50}abTest.{0,50}'' /tmp/abtest-chunk.js)"
     ]
   }
 }

@@ -1,112 +1,350 @@
 {
   "name": "Video Tools Feature Set",
-  "version": "1.5.0",
+  "version": "3.0.0",
   "status": "draft",
   "overview": {
     "description": "Add tasteful extra features behind a minimal 'Video Tools' dropdown. Features enhance video watching without cluttering the minimal interface. Progressive disclosure: users who don't want features don't see them.",
     "principles": [
-      "Minimal by default - all tools in dropdown, none active initially",
+      "Minimal by default - all tools in dropdown, none active initially (except SponsorBlock)",
+      "SponsorBlock enabled by default in manual mode (shows skip button overlay)",
       "Active tools shown at top level for quick access",
       "Active tools reset on video navigation, settings persist in localStorage",
-      "URL params only for session-enabled tools (shareable)",
-      "Graceful degradation - if a service is down, player still works"
+      "URL params for shareable tool state (silence only - sponsors is default on)",
+      "Graceful degradation - if a service is down, player still works",
+      "Vertical slicing - each feature built end-to-end before starting next"
     ]
   },
+  "implementation_phases": [
+    {
+      "phase": -1,
+      "name": "Svelte 5 Upgrade",
+      "description": "Prerequisite for modern reactivity patterns ($state, $effect, $derived)",
+      "features": ["svelte5-upgrade"]
+    },
+    {
+      "phase": 0,
+      "name": "YouTube IFrame Player API",
+      "description": "Foundation for all skip features",
+      "features": ["youtube-player-api"]
+    },
+    {
+      "phase": 1,
+      "name": "Minimal UI Shell",
+      "description": "Dropdown container and active tools area - no state system yet",
+      "features": ["video-tools-ui"]
+    },
+    {
+      "phase": 2,
+      "name": "SponsorBlock",
+      "description": "Enabled by default in manual mode. No backend needed. Validates skip pattern before investing in silence backend.",
+      "features": ["sponsor-skip"]
+    },
+    {
+      "phase": 3,
+      "name": "Silence Skipper",
+      "description": "Most complex feature. Backend processes audio, frontend skips/speeds through silence.",
+      "features": ["silence-skipper"]
+    },
+    {
+      "phase": 4,
+      "name": "Copy Transcript",
+      "description": "Simple addition to existing backend",
+      "features": ["copy-transcript"]
+    }
+  ],
   "features": [
+    {
+      "id": "svelte5-upgrade",
+      "name": "Svelte 5 Upgrade",
+      "phase": -1,
+      "priority": "P0",
+      "description": "Upgrade from Svelte 4 to Svelte 5 for modern reactivity patterns",
+      "implementation": {
+        "dependencies_to_update": ["svelte", "@sveltejs/kit", "svelte-check"],
+        "verification": ["pnpm check", "test existing pages"],
+        "notes": "Svelte 5 is backwards compatible with Svelte 4 syntax. New components use runes."
+      },
+      "acceptance_criteria": [
+        "Svelte 5 installed and working",
+        "Existing pages (home, video, shorts) still function",
+        "No type errors from svelte-check"
+      ]
+    },
     {
       "id": "youtube-player-api",
       "name": "YouTube IFrame Player API Migration",
+      "phase": 0,
       "priority": "P0",
       "description": "Replace static iframe with YouTube IFrame Player API to enable programmatic control",
       "rationale": "Required foundation for silence skipper, sponsor skip, and timestamp-aware features",
       "implementation": {
+        "component": "src/lib/components/YouTubePlayer.svelte",
+        "store": "src/lib/stores/playerStore.ts",
         "api_script": "https://www.youtube.com/iframe_api",
-        "time_polling": "100ms interval, start on PLAYING, stop on pause/end",
-        "events": ["onReady", "onStateChange"]
+        "time_polling": "100ms interval when PLAYING, stop on pause/end/buffer",
+        "events": ["onReady", "onStateChange"],
+        "player_vars": {
+          "autoplay": 0,
+          "modestbranding": 1,
+          "rel": 0
+        },
+        "store_state": {
+          "currentTime": "number (seconds)",
+          "duration": "number (seconds)",
+          "playbackRate": "number",
+          "playerState": "unstarted | ended | playing | paused | buffering | cued"
+        },
+        "safety": "Guard all player method calls: if (!player || typeof player.method !== 'function') return"
       },
       "acceptance_criteria": [
         "Player loads via IFrame API instead of raw iframe",
-        "Can programmatically: play, pause, seekTo, getCurrentTime, setPlaybackRate",
+        "Can programmatically: play, pause, seekTo, getCurrentTime, setPlaybackRate, getPlaybackRate",
         "Player state accessible via Svelte store",
         "100ms time polling when playing",
         "No visual regression from current embed"
       ]
     },
     {
-      "id": "silence-skipper",
-      "name": "Silence Skipper",
-      "priority": "P1",
-      "description": "Automatically skip silent segments in videos with user-configurable settings",
-      "components": {
-        "backend": {
-          "type": "Python FastAPI on Railway.app",
-          "features": [
-            "Analyze video audio for ALL silent segments (threshold: -40dB, min: 100ms)",
-            "Return full segment list (frontend filters by user settings)",
-            "SQLite with WAL mode for cache",
-            "Global queue: 1 video processing at a time",
-            "Per-IP rate limiting (5/hour for new videos)",
-            "Polling endpoint for status (no SSE)",
-            "CORS enabled"
-          ],
-          "endpoints": {
-            "submit": "POST /silence/request?v={videoId}",
-            "status": "GET /silence/status?v={videoId}",
-            "health": "GET /health"
-          }
+      "id": "video-tools-ui",
+      "name": "Minimal Video Tools UI Shell",
+      "phase": 1,
+      "priority": "P0",
+      "description": "Dropdown container and active tools area. Features add their own UI.",
+      "design": {
+        "dropdown": {
+          "trigger": "'▸ video tools' text link",
+          "expanded": "'▾ video tools'",
+          "collapsed_by_default": true,
+          "content": "Empty container - features add their own toggles"
         },
-        "frontend": {
-          "features": [
-            "Toggle in Video Tools dropdown",
-            "Mode toggle: Skip vs Speed (2x)",
-            "Settings panel: minSkipMs, leadInMs, leadOutMs",
-            "Adjusted duration display showing time saved",
-            "Client-side filtering of segments by settings",
-            "TanStack Query with polling for queue status"
-          ],
-          "settings": {
-            "mode": { "default": "skip", "options": ["skip", "speed"], "description": "Skip silence or speed through at 2x" },
-            "minSkipMs": { "default": 500, "description": "Minimum silence duration to skip" },
-            "leadInMs": { "default": 100, "description": "Resume this many ms before silence ends" },
-            "leadOutMs": { "default": 0, "description": "Wait this many ms into silence before skipping" }
-          },
-          "ui": {
-            "dropdown": "Simple on/off toggle only",
-            "top_level": "Full controls: mode toggle, min skip, lead-in/out, duration display, off button"
-          }
+        "active_tools_area": {
+          "location": "Below video, next to 'about' link",
+          "shows": "Active tool UI components",
+          "on_first_load": "Empty (all tools inactive except SponsorBlock)"
+        },
+        "url_params": {
+          "read": "?tools= on page load",
+          "write": "updateToolsParam(toolName, active)",
+          "format": "?tools=silence",
+          "note": "Sponsors enabled by default, no URL param needed"
         }
       },
       "acceptance_criteria": [
-        "Backend returns all detected silences",
-        "Frontend filters by user settings (minSkipMs)",
-        "Frontend applies leadIn/leadOut margins when seeking",
+        "Dropdown expands/collapses on click",
+        "Active tools area exists for features to populate",
+        "URL param helpers work correctly",
+        "Minimal styling matching existing emerald aesthetic"
+      ]
+    },
+    {
+      "id": "sponsor-skip",
+      "name": "Skip Sponsors (SponsorBlock)",
+      "phase": 2,
+      "priority": "P1",
+      "description": "Integrate SponsorBlock API to skip sponsor segments. Enabled by default in manual mode. No backend needed.",
+      "components": {
+        "main": "src/lib/components/SponsorSkip.svelte",
+        "active_ui": "src/lib/components/SponsorSkipActive.svelte",
+        "overlay_button": "src/lib/components/SponsorSkipButton.svelte",
+        "settings": "src/lib/components/SponsorSettings.svelte",
+        "types": "src/lib/types/sponsorBlock.ts"
+      },
+      "api": {
+        "url": "https://sponsor.ajay.app/api/skipSegments?videoID={videoId}",
+        "response_format": "[{segment: [start, end], category: string, UUID: string}]",
+        "404_means": "No segments found (not an error)"
+      },
+      "categories": {
+        "all": ["sponsor", "selfpromo", "interaction", "intro", "outro", "preview", "music_offtopic", "filler"],
+        "default_enabled": ["sponsor", "selfpromo"]
+      },
+      "settings": {
+        "localStorage_key": "yt-embed-sponsor-settings",
+        "schema": {
+          "mode": "auto | manual (default: manual)",
+          "skipCategories": ["sponsor", "selfpromo"]
+        }
+      },
+      "ui": {
+        "dropdown": "Toggle 'Skip sponsors' (on by default) + gear icon for settings",
+        "settings_popover": "Mode toggle (Auto-skip | Show button) + category checkboxes",
+        "top_level_when_active_auto_mode": "Label 'SponsorBlock ✓ (N segments)' + click to disable",
+        "overlay_button_manual_mode": {
+          "position": "Bottom-right of player, above YouTube controls",
+          "visibility": "Only when currentTime is within a sponsor segment",
+          "content": "'Skip sponsor →' with category label",
+          "style": "Semi-transparent background, fades in/out"
+        }
+      },
+      "states": {
+        "default": "Enabled, manual mode (button appears only when in sponsor segment)",
+        "off": "User explicitly disabled in dropdown",
+        "loading": "'Skip sponsors ...' in dropdown",
+        "ready_auto": "Top-level 'SponsorBlock ✓ (N)' indicator",
+        "ready_manual": "Nothing until sponsor segment, then overlay button",
+        "ready_no_segments": "'Skip sponsors (none found)' in dropdown",
+        "error": "'Skip sponsors ⚠' with tooltip"
+      },
+      "acceptance_criteria": [
+        "Segments fetched via TanStack Query on page load (enabled by default)",
+        "Skip logic triggers on playerStore time updates",
+        "Auto mode: seeks past segment immediately",
+        "Manual mode: shows overlay button, user clicks to skip",
+        "Category settings saved to localStorage",
+        "Only skips segments matching enabled categories",
+        "Handles 404 (no segments) gracefully"
+      ]
+    },
+    {
+      "id": "silence-skipper",
+      "name": "Silence Skipper",
+      "phase": 3,
+      "priority": "P1",
+      "description": "Automatically skip or speed through silent segments with user-configurable settings",
+      "components": {
+        "backend": {
+          "location": "backend/silence-service/",
+          "framework": "Python FastAPI",
+          "deployment": "Railway.app with volume mount for SQLite",
+          "files": ["main.py", "silence.py", "queue.py", "db.py", "requirements.txt", "Dockerfile", "railway.toml"]
+        },
+        "frontend": {
+          "main": "src/lib/components/SilenceSkipper.svelte",
+          "active_ui": "src/lib/components/SilenceSkipperActive.svelte",
+          "types": "src/lib/types/silence.ts"
+        }
+      },
+      "backend_spec": {
+        "endpoints": {
+          "submit": {
+            "method": "POST",
+            "path": "/silence/request",
+            "params": {
+              "v": "videoId",
+              "duration": "video duration in seconds (from player API onReady)"
+            },
+            "rate_limit": "5 new submissions per IP per hour (cached hits don't count)"
+          },
+          "status": {
+            "method": "GET",
+            "path": "/silence/status",
+            "params": { "v": "videoId" }
+          },
+          "health": {
+            "method": "GET",
+            "path": "/health"
+          }
+        },
+        "database": {
+          "type": "SQLite with WAL mode",
+          "path": "/data/silence.db",
+          "tables": ["silence_cache", "queue", "rate_limits"]
+        },
+        "cache": {
+          "strategy": "Indefinite cache, keyed by video_id",
+          "invalidation": "Re-process if request duration != cached duration (catches video edits)",
+          "no_ttl": true
+        },
+        "queue": {
+          "concurrency": "1 video at a time (avoid IP ban)",
+          "max_length": 50,
+          "polling_interval": "2 seconds",
+          "timeout_per_video": "5 minutes",
+          "crash_recovery": "Reset 'processing' jobs to 'queued' on startup"
+        },
+        "silence_detection": {
+          "library": "pydub.silence.detect_silence",
+          "audio_format": "worstaudio/worst via yt-dlp",
+          "threshold": "-40dB",
+          "min_chunk": "100ms (frontend filters further)",
+          "seek_step": "10ms"
+        },
+        "limits": {
+          "max_video_duration": "12 hours"
+        },
+        "response_format": {
+          "cached": "{ status: 'cached', segments: [...], duration_sec }",
+          "queued": "{ status: 'queued', position: N }",
+          "processing": "{ status: 'processing' }",
+          "completed": "{ status: 'completed', segments: [...], duration_sec }",
+          "failed": "{ status: 'failed', error: '...' }"
+        },
+        "errors": ["invalid_video_id", "video_unavailable", "age_restricted", "video_too_long", "download_failed", "rate_limited", "queue_full"]
+      },
+      "frontend_spec": {
+        "important": "Wait for player onReady before submitting - need duration from player API",
+        "settings": {
+          "localStorage_key": "yt-embed-silence-settings",
+          "schema": {
+            "mode": { "type": "string", "options": ["skip", "speed"], "default": "skip" },
+            "minSkipMs": { "type": "number", "default": 500, "description": "Minimum silence duration to act on" },
+            "timeBeforeSkipping": { "type": "number", "default": 0, "description": "Wait this long into silence before skipping" },
+            "timeAfterSkipping": { "type": "number", "default": 100, "description": "Resume this early before silence ends" }
+          }
+        },
+        "skip_logic": {
+          "mode_skip": "Seek to end of silence segment",
+          "mode_speed": "Set playback rate to 2x during silence, restore on exit",
+          "speed_reset_on": ["pause", "seek", "tool disabled", "mode switched", "component destroyed"]
+        },
+        "ui": {
+          "dropdown": "Simple on/off toggle: 'Skip silence'",
+          "top_level_when_active": [
+            "Mode toggle: Skip | 2x speed",
+            "Min skip slider (100ms - 2000ms)",
+            "Time before/after inputs (0ms - 500ms)",
+            "Time saved display: '32:15 → 28:42 (-3:33)'",
+            "Toggle off button"
+          ]
+        },
+        "states": {
+          "off": "Toggle shows 'Skip silence'",
+          "queued": "'Skip silence (queue: #N)'",
+          "processing": "'Skip silence (analyzing...)'",
+          "ready": "'Skip silence ✓'",
+          "error": "'Skip silence ⚠' with retry button"
+        }
+      },
+      "acceptance_criteria": [
+        "Backend detects all silences ≥100ms, returns full list in one response",
+        "Frontend filters segments by minSkipMs setting",
+        "Frontend applies timeBeforeSkipping/timeAfterSkipping margins",
+        "Speed mode correctly enters/exits 2x speed on silence boundaries",
+        "Speed mode resets to normal rate on pause/seek",
         "Settings saved to localStorage",
-        "Active state in URL params when user-enabled"
+        "Cache invalidates when video duration changes",
+        "URL param 'silence' activates tool on page load"
       ]
     },
     {
       "id": "copy-transcript",
       "name": "Copy Transcript",
+      "phase": 4,
       "priority": "P1",
       "description": "One-click copy video transcript to clipboard",
       "components": {
         "backend": {
+          "location": "backend/silence-service/ (same service)",
           "endpoint": "GET /transcript?v={videoId}&timestamps={true|false}",
-          "returns": "Plain text transcript",
-          "cache": "SQLite WAL mode"
+          "library": "youtube-transcript-api",
+          "cache": "SQLite, 7 day TTL"
         },
         "frontend": {
-          "features": [
-            "Submenu in Video Tools: 'Copy transcript ▸'",
-            "Two options: 'Plain text' / 'With timestamps'",
-            "Click → fetch → copy to clipboard",
-            "Inline feedback: 'Copied!' or error message"
-          ],
-          "note": "No transcript display UI - direct to clipboard",
-          "ui": {
-            "dropdown": "Submenu 'Copy transcript ▸' with two options: Plain text / With timestamps",
-            "top_level": "Not shown (action-only, no persistent state)"
-          }
+          "component": "src/lib/components/CopyTranscript.svelte"
+        }
+      },
+      "formats": {
+        "plain": "Text joined with spaces",
+        "timestamps": "[0:00] First line\\n[0:05] Second line"
+      },
+      "ui": {
+        "dropdown": "Submenu 'Copy transcript ▸' with 'Plain text' / 'With timestamps'",
+        "top_level": "Not shown (action-only, no persistent state)",
+        "states": {
+          "default": "Show submenu options",
+          "loading": "'Copying...'",
+          "success": "'Copied!' (brief inline feedback)",
+          "error": "'No transcript available'"
         }
       },
       "acceptance_criteria": [
@@ -114,81 +352,7 @@
         "Two copy options: plain and timestamped",
         "Direct clipboard copy, no preview",
         "Clear feedback on success/failure",
-        "Graceful error when no transcript"
-      ]
-    },
-    {
-      "id": "sponsor-skip",
-      "name": "Skip Sponsors (SponsorBlock)",
-      "priority": "P1",
-      "description": "Integrate SponsorBlock API to skip sponsor segments with configurable categories",
-      "components": {
-        "frontend": {
-          "features": [
-            "On/off toggle in Video Tools dropdown",
-            "Settings gear → category checkboxes",
-            "TanStack Query for segments",
-            "Filter segments by enabled categories",
-            "Auto-skip matching segments"
-          ],
-          "api": "https://sponsor.ajay.app/api/skipSegments?videoID={videoId}",
-          "categories": {
-            "default_on": ["sponsor", "selfpromo"],
-            "default_off": ["interaction", "intro", "outro", "preview", "music_offtopic", "filler"]
-          },
-          "ui": {
-            "dropdown": "Simple on/off toggle only",
-            "top_level": "Label with segment count + gear icon for category settings + off button"
-          }
-        }
-      },
-      "acceptance_criteria": [
-        "Segments fetched when tool active",
-        "Category settings saved to localStorage",
-        "Only skips segments matching enabled categories",
-        "Settings UI is minimal (expandable section)",
-        "Handles 404 (no segments) gracefully"
-      ]
-    },
-    {
-      "id": "video-tools-ui",
-      "name": "Video Tools Dropdown + State System",
-      "priority": "P0",
-      "description": "Minimal dropdown with two-layer state and two display areas",
-      "design": {
-        "top_level": {
-          "location": "Below video, next to 'about' link",
-          "shows": "Currently ACTIVE tools as compact toggles",
-          "on_first_load": "Empty (all tools inactive)"
-        },
-        "dropdown": {
-          "trigger": "'▸ video tools' text link",
-          "shows": "ALL tools with full toggles + settings",
-          "collapsed_by_default": true
-        },
-        "flow": "Enable tool in dropdown → appears at top level + stays in dropdown"
-      },
-      "state_architecture": {
-        "all_tools_visible": "Always shown in dropdown, no visibility toggle",
-        "active_tools": {
-          "source": "URL params or user action",
-          "persists": "until video navigation",
-          "in_url": "only when user-enabled",
-          "display": "top level (compact) + dropdown (full)"
-        },
-        "settings": {
-          "source": "localStorage",
-          "persists": "across sessions",
-          "applies_when": "tool is active"
-        }
-      },
-      "acceptance_criteria": [
-        "All tools visible in dropdown on first visit",
-        "Active tools shown at top level for quick access",
-        "Tools inactive by default on each video",
-        "User-enabled tools add to URL params",
-        "URL params activate tools on page load",
-        "Tools reset to inactive on video change, dropdown persists"
+        "Graceful error when no transcript (404)"
       ]
     }
   ],
@@ -201,62 +365,93 @@
   ],
   "technical_requirements": {
     "frontend": {
-      "framework": "SvelteKit (existing)",
+      "framework": "SvelteKit with Svelte 5",
       "player": "YouTube IFrame Player API",
       "state": {
-        "player": "Svelte store (currentTime, playing, duration)",
-        "tools": "Svelte store (active, loading, error, settings)",
-        "persistence": "localStorage for settings, URL params for active state"
+        "player": "Svelte store (currentTime, duration, playbackRate, playerState)",
+        "tools": "Per-feature state, no shared toolsStore",
+        "persistence": "localStorage for settings (per-feature keys), URL params for active state"
       },
-      "data_fetching": "TanStack Query",
+      "data_fetching": "TanStack Query (@tanstack/svelte-query)",
       "analytics": "sendAnalyticsEvent() via existing pattern",
       "env_vars": {
         "VITE_SILENCE_SERVICE_URL": "Backend URL (public, not secret)"
       }
     },
     "backend": {
-      "deployment": "Railway.app",
+      "deployment": "Railway.app with volume mount",
       "framework": "Python FastAPI",
-      "database": "SQLite with WAL mode",
-      "cors": "Allow yt.ttools.io (or *)",
-      "queue": "Global, 1 video at a time",
-      "rate_limiting": "Per-IP, 5 requests/hour for uncached",
-      "silence_detection": {
-        "threshold": "-40dB",
-        "min_chunk": "100ms (frontend filters further)"
-      }
+      "database": "SQLite with WAL mode at /data/silence.db",
+      "cors": "Allow * (or restrict to yt.ttools.io)",
+      "dependencies": ["fastapi", "uvicorn", "yt-dlp", "pydub", "python-multipart", "youtube-transcript-api"]
     }
   },
-  "localStorage_schema": {
-    "key": "yt-embed-tool-defaults",
-    "schema": {
-      "silenceSettings": {
-        "mode": "skip",
-        "minSkipMs": 500,
-        "leadInMs": 100,
-        "leadOutMs": 0
-      },
-      "sponsorBlockSettings": {
-        "skipCategories": ["sponsor", "selfpromo"]
-      }
+  "localStorage_keys": {
+    "yt-embed-sponsor-settings": {
+      "mode": "manual",
+      "skipCategories": ["sponsor", "selfpromo"]
+    },
+    "yt-embed-silence-settings": {
+      "mode": "skip",
+      "minSkipMs": 500,
+      "timeBeforeSkipping": 0,
+      "timeAfterSkipping": 100
     }
   },
-  "url_params_spec": {
+  "url_params": {
     "tools": {
-      "description": "Comma-separated list of active tools (user-enabled only)",
-      "example": "?v=dQw4w9WgXcQ&tools=silence,sponsors",
-      "valid_values": ["silence", "sponsors"]
+      "description": "Comma-separated list of active tools (sponsors excluded - enabled by default)",
+      "example": "?tools=silence",
+      "valid_values": ["silence"]
     }
   },
   "analytics_events": {
-    "toolEnabled": "sendAnalyticsEvent('toolEnabled', toolName)",
-    "toolDisabled": "sendAnalyticsEvent('toolDisabled', toolName)",
-    "transcriptCopied": "sendAnalyticsEvent('transcriptCopied', 'plain' | 'withTimestamps')",
-    "silenceSkipped": "sendAnalyticsEvent('silenceSkipped') - debounced 10s",
-    "sponsorSkipped": "sendAnalyticsEvent('sponsorSkipped') - debounced 10s",
-    "silenceQueueJoined": "sendAnalyticsEvent('silenceQueueJoined')"
+    "toolEnabled": { "event": "toolEnabled", "details": "toolName (sponsors only when re-enabled after user disabled)" },
+    "toolDisabled": { "event": "toolDisabled", "details": "toolName" },
+    "transcriptCopied": { "event": "transcriptCopied", "details": "'plain' | 'withTimestamps'" },
+    "silenceSkipped": { "event": "silenceSkipped", "debounce": "10s" },
+    "sponsorSkipped": { "event": "sponsorSkipped", "details": "'auto' | 'manual'", "debounce": "10s for auto" },
+    "silenceQueueJoined": { "event": "silenceQueueJoined" }
   },
-  "legal_notes": {
-    "yt_dlp_usage": "Audio processed server-side and deleted. No user downloads. Will comply with any YouTube cease letter."
+  "error_handling": {
+    "silence_service_down": "Toggle disabled, 'Service unavailable' tooltip",
+    "silence_processing_failed": "Error state with retry button",
+    "silence_queue_full": "'Queue full, try later'",
+    "age_restricted_video": "'Can't process age-restricted videos'",
+    "sponsorblock_api_down": "Toggle disabled, graceful message",
+    "sponsorblock_404": "'No sponsors found' (not error)",
+    "transcript_unavailable": "'No transcript for this video'",
+    "clipboard_api_fails": "'Couldn't copy, try again'"
+  },
+  "file_structure": {
+    "frontend": [
+      "src/lib/components/YouTubePlayer.svelte",
+      "src/lib/components/VideoTools.svelte",
+      "src/lib/components/SponsorSkip.svelte",
+      "src/lib/components/SponsorSkipActive.svelte",
+      "src/lib/components/SponsorSkipButton.svelte",
+      "src/lib/components/SponsorSettings.svelte",
+      "src/lib/components/SilenceSkipper.svelte",
+      "src/lib/components/SilenceSkipperActive.svelte",
+      "src/lib/components/CopyTranscript.svelte",
+      "src/lib/stores/playerStore.ts",
+      "src/lib/types/sponsorBlock.ts",
+      "src/lib/types/silence.ts",
+      "src/lib/config.ts"
+    ],
+    "backend": [
+      "backend/silence-service/main.py",
+      "backend/silence-service/silence.py",
+      "backend/silence-service/transcript.py",
+      "backend/silence-service/queue.py",
+      "backend/silence-service/db.py",
+      "backend/silence-service/requirements.txt",
+      "backend/silence-service/Dockerfile",
+      "backend/silence-service/railway.toml"
+    ]
+  },
+  "notes": {
+    "multiple_tools_active": "When both SponsorSkip and SilenceSkipper are enabled, both may try to seek. Sponsor segments are larger, so sponsor skip effectively takes precedence. Speed mode state resets correctly on any seek.",
+    "legal": "Audio processed server-side and deleted immediately. No user downloads. Will comply with any YouTube cease letter."
   }
 }
