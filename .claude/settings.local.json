@@ -7,7 +7,17 @@
       "Bash(# Download and search large chunks for viewstats backend curl -s \"\"https://www.viewstats.com/_next/static/chunks/36204-3fc01e07eba3982b.js\"\" curl -s \"\"https://www.viewstats.com/_next/static/chunks/49686-d668708c1a3bd1f3.js\"\" # Search for backend URL patterns grep -oE ''https://[a-z0-9.-]+viewstats[^\"\"''\\\\'''']*'' /tmp/chunk1.js /tmp/chunk2.js)",
       "Bash(done)",
       "Bash(xargs -I{} curl -s \"https://www.viewstats.com/_next/static/chunks/{}\")",
-      "Bash(# Download and analyze the abTest chunk more thoroughly curl -s \"\"https://www.viewstats.com/_next/static/chunks/47704-1c0d68eb3e979bd7.js\"\" wc -c /tmp/abtest-chunk.js # Find all abTest related patterns grep -oE ''.{0,50}abTest.{0,50}'' /tmp/abtest-chunk.js)"
+      "Bash(# Download and analyze the abTest chunk more thoroughly curl -s \"\"https://www.viewstats.com/_next/static/chunks/47704-1c0d68eb3e979bd7.js\"\" wc -c /tmp/abtest-chunk.js # Find all abTest related patterns grep -oE ''.{0,50}abTest.{0,50}'' /tmp/abtest-chunk.js)",
+      "Bash(# Download main app chunk that handles data fetching curl -s \"\"https://www.viewstats.com/_next/static/chunks/41863-391d9f674bda9149.js\"\" wc -c /tmp/main-chunk.js # Search for URL construction patterns grep -oE ''\\(concat|join|template\\).{0,100}\\(video|channel|thumbnail\\)'' /tmp/main-chunk.js)",
+      "Bash(pnpm install:*)",
+      "Bash(pnpm add:*)",
+      "Bash(pnpm check:*)",
+      "Bash(pnpm build:*)",
+      "Bash(timeout 5 pnpm dev:*)",
+      "Bash(# Check for server actions in the chunks \\(Next.js 14+ pattern\\) grep -oE ''\\(serverAction|useFormState|formAction\\)[^}]*'' /tmp/main-chunk.js /tmp/abtest-chunk.js)",
+      "Bash(git restore:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
     ]
   }
 }

@@ -1,0 +1,23 @@
+## Phase -1: Svelte 5 Upgrade - COMPLETED
+
+### What was done:
+- Updated Svelte from 4.2.5 to 5.47.0
+- Updated SvelteKit from 1.27.6 to 2.50.0
+- Updated Vite from 4.5.0 to 6.4.1
+- Added @sveltejs/vite-plugin-svelte 5.1.1
+- Updated adapters (auto and static) to v3
+- Updated svelte-check to v4
+- Fixed vitePreprocess import path in svelte.config.js (moved to @sveltejs/vite-plugin-svelte)
+- Added Umami analytics global type declaration in app.d.ts
+- Fixed pre-existing type errors by adding null checks for umami global
+
+### Verification:
+- pnpm check passes with 0 errors (only CSS warnings expected with Tailwind)
+- pnpm build succeeds
+- Dev server starts correctly
+
+### Notes:
+- Existing components use Svelte 4 syntax (backward compatible)
+- New components will use Svelte 5 runes ($state, $effect, $derived)
+
+Commit: 87e235f
