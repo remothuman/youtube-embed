@@ -8,6 +8,7 @@
 	import VideoTools from '$lib/components/VideoTools.svelte';
 	import SponsorSkip from '$lib/components/SponsorSkip.svelte';
 	import SponsorSkipButton from '$lib/components/SponsorSkipButton.svelte';
+	import SilenceSkipper from '$lib/components/SilenceSkipper.svelte';
 
 	let videoId = $page.url.searchParams.get('v') as string; 
 	
@@ -68,6 +69,7 @@
     <VideoTools>
 		{#snippet dropdown()}
 			<SponsorSkip {videoId} />
+			<SilenceSkipper {videoId} showActiveUI={true} />
 		{/snippet}
 	</VideoTools>
 

@@ -216,7 +216,57 @@ Commit: 605ddce
 - Added duration validation (reject <= 0 or > 12 hours)
 
 ### Notes:
-- Frontend integration (Phase 3.2) still pending
 - Service ready for Railway deployment
 - Rate limiting protects against abuse
 - Cache invalidation handles video re-uploads
+
+---
+
+## Phase 3.2: Silence Skipper Frontend - COMPLETED
+
+### What was done:
+- Created `src/lib/types/silence.ts` - Type definitions
+  - SilenceSegment, SilenceSettings, SilenceResponse types
+  - DEFAULT_SETTINGS: mode='skip', minSkipMs=500, timeBeforeSkipping=0, timeAfterSkipping=100
+  - STORAGE_KEY for localStorage
+
+- Created `src/lib/config.ts` - API URL configuration
+  - SILENCE_API_URL from VITE_SILENCE_SERVICE_URL env var
+
+- Created `src/lib/components/SilenceSkipper.svelte` - Main component
+  - TanStack Query for /silence/request (mutation) and /silence/status (polling)
+  - Waits for player onReady before submitting (needs duration)
+  - Settings persistence with localStorage + validation
+  - Skip mode: seeks past silence segment (with recently-skipped tracking to prevent re-triggering)
+  - Speed mode: sets 2x playback during silence, restores on exit
+  - Speed mode resets on pause/seek/disable/mode change
+  - URL param integration: ?tools=silence activates on page load
+  - Analytics events: toolEnabled, toolDisabled, silenceSkipped, silenceQueueJoined
+  - Proper cleanup on destroy (playback rate reset, polling stop)
+
+- Created `src/lib/components/SilenceSkipperActive.svelte` - Active state UI
+  - Mode toggle: Skip | 2x speed
+  - Min silence slider (100ms - 2000ms)
+  - Time before/after skip inputs (0ms - 500ms)
+  - Time saved display: "32:15 → 28:42 (-3:33)"
+  - Disable button
+  - Accessible labels (a11y)
+
+- Integrated into `src/routes/[url]/+page.svelte`
+  - Added SilenceSkipper to VideoTools dropdown
+  - Active UI shows inline when ready (within expanded dropdown)
+
+### Code Review Fixes:
+- Added recentlySkippedEndMs tracking to prevent infinite skip loops
+- Added isPolling cleanup in onDestroy
+- Fixed TypeScript null safety in skip logic
+
+### Verification:
+- pnpm check passes with 0 errors
+- pnpm build succeeds
+
+### Notes:
+- Uses Svelte 5 runes ($state, $effect, $derived) throughout
+- Active UI shows in dropdown when expanded (simpler than separate slot)
+- Speed mode capped at 2x (YouTube IFrame API maximum)
+- Requires VITE_SILENCE_SERVICE_URL env var (toggle disabled if not set)
