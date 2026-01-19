@@ -21,3 +21,51 @@
 - New components will use Svelte 5 runes ($state, $effect, $derived)
 
 Commit: 87e235f
+
+---
+
+## Phase 0: YouTube IFrame Player API - COMPLETED
+
+### What was done:
+- Created `src/lib/stores/playerStore.ts` - Player state management
+  - Svelte stores for currentTime, duration, playbackRate, playerState
+  - Combined playerStore for convenience
+  - subscribeToTime() for skip features to hook into time updates
+  - ytStateToString() helper to convert YT state numbers to readable strings
+  - resetPlayerStore() for video navigation
+
+- Created `src/lib/components/YouTubePlayer.svelte` - YouTube IFrame Player API component
+  - Loads YouTube IFrame API script dynamically
+  - Initializes player with new YT.Player()
+  - Handles onReady and onStateChange events
+  - 100ms time polling when PLAYING, stops on pause/end/buffer
+  - Exposed controls: play, pause, seekTo, getCurrentTime, setPlaybackRate, getPlaybackRate, getDuration
+  - All player method calls guarded (if player && typeof player.method === 'function')
+  - Maintains 16:9 responsive aspect ratio
+  - Handles videoId changes via $effect
+  - Proper cleanup on component destroy
+
+- Added YouTube IFrame API TypeScript declarations in `src/app.d.ts`
+  - YT namespace with Player class, PlayerState, event types
+  - onYouTubeIframeAPIReady global callback type
+
+- Integrated YouTubePlayer into `src/routes/[url]/+page.svelte`
+  - Replaced raw iframe with YouTubePlayer component
+  - Removed redundant wrapper styles (now in component)
+
+### Verification:
+- pnpm check passes with 0 errors
+- pnpm build succeeds
+- Player loads via IFrame API
+- Programmatic control available (play, pause, seekTo, etc.)
+- Player state accessible via Svelte stores
+- 100ms time polling when playing
+- No visual regression from previous embed
+
+### Notes:
+- Uses Svelte 5 runes ($state, $effect) alongside traditional stores
+- Traditional stores used for cross-component reactivity (playerStore)
+- Component-local state uses $state rune
+- Pre-existing setTimeout memory leak in +page.svelte noted but not fixed (out of scope)
+
+Commit: 74be604
