@@ -165,3 +165,58 @@ Commit: 605ddce
 - Uses Svelte 5 runes ($state, $effect, $derived) throughout
 - Query enabled captures initial settings.enabled value (acceptable since default=true)
 - SponsorSkipActive component deferred (not needed for MVP)
+
+---
+
+## Phase 3.1: Silence Skipper Backend - COMPLETED
+
+### What was done:
+- Created `backend/silence-service/` directory with Python FastAPI service
+
+- Created `db.py` - SQLite operations
+  - WAL mode for performance
+  - silence_cache table: stores detected segments indefinitely (keyed by video_id)
+  - queue table: processing queue with status tracking
+  - rate_limits table: per-IP rate limiting (5 requests/hour)
+  - Atomic `claim_next_job()` function to prevent race conditions
+
+- Created `silence.py` - Silence detection logic
+  - Downloads audio via yt-dlp (lowest quality for speed)
+  - Detects silence using pydub.silence.detect_silence
+  - Settings: -40dB threshold, 100ms minimum, 10ms seek step
+  - Validates video ID format, duration, age restriction
+  - Max video duration: 12 hours
+  - Error handling with typed SilenceDetectionError
+
+- Created `worker.py` - Background queue worker
+  - Polls queue every 2 seconds
+  - 5-minute timeout per video
+  - Crash recovery: resets stuck 'processing' jobs on startup
+  - Runs detection in thread pool to not block event loop
+
+- Created `main.py` - FastAPI app
+  - POST /silence/request: Submit video for analysis
+    - Returns cached results if duration matches
+    - Invalidates cache if duration changed (video edited)
+    - Rate limits new submissions
+    - Max queue length: 50
+  - GET /silence/status: Poll for processing status
+  - GET /health: Health check with queue length
+  - CORS enabled for frontend access
+
+- Created deployment files
+  - requirements.txt: fastapi, uvicorn, yt-dlp, pydub
+  - Dockerfile: Python 3.12 + ffmpeg
+  - railway.toml: Volume mount for SQLite persistence
+
+### Code Review Fixes:
+- Renamed queue.py to worker.py (avoid stdlib collision)
+- Made job pickup atomic (SELECT + UPDATE in same transaction)
+- Fixed CORS config (removed allow_credentials with wildcard)
+- Added duration validation (reject <= 0 or > 12 hours)
+
+### Notes:
+- Frontend integration (Phase 3.2) still pending
+- Service ready for Railway deployment
+- Rate limiting protects against abuse
+- Cache invalidation handles video re-uploads
