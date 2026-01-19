@@ -17,7 +17,30 @@
       "Bash(# Check for server actions in the chunks \\(Next.js 14+ pattern\\) grep -oE ''\\(serverAction|useFormState|formAction\\)[^}]*'' /tmp/main-chunk.js /tmp/abtest-chunk.js)",
       "Bash(git restore:*)",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(find:*)",
+      "Bash(ls:*)",
+      "Bash(git -C /Users/tmn/code/deployed/youtube-embed-dev-branch status:*)",
+      "Bash(git -C /Users/tmn/code/deployed/youtube-embed-dev-branch diff --stat)",
+      "Bash(git -C /Users/tmn/code/deployed/youtube-embed-dev-branch log --oneline -5)",
+      "Bash(git -C /Users/tmn/code/deployed/youtube-embed-dev-branch add src/lib/components/VideoTools.svelte src/lib/utils/videoToolsParams.ts src/routes/[url]/+page.svelte development/progress.txt)",
+      "Bash(git -C /Users/tmn/code/deployed/youtube-embed-dev-branch commit -m \"$\\(cat <<''EOF''\nPhase 1: Minimal Video Tools UI Shell\n\n- Add VideoTools.svelte dropdown with expand/collapse toggle\n- Add URL param helpers \\(getActiveTools, updateToolsParam, isToolActive\\)\n- Integrate VideoTools into video page, replacing \"more tools\" link\n- Uses Svelte 5 snippets for features to add their own UI\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(# Search more aggressively for API endpoint patterns in all chunks cat /tmp/*.js)",
+      "Bash(tr:*)",
+      "Bash(# Download more chunks and search curl -s \"\"https://www.viewstats.com/_next/static/chunks/52181-3b6910fdf917d3ee.js\"\" curl -s \"\"https://www.viewstats.com/_next/static/chunks/61181-a744a5f8faf59939.js\"\" # Look for fetch/axios calls with URLs grep -oE ''\\(fetch|axios|get|post|put|delete\\)\\\\\\([^\\)]*\"\"[^\"\"]*\"\"'' /tmp/chunk-*.js)",
+      "Bash(curl:*)",
+      "Bash(# Check if brotli is installed and try manually which brotli || brew list brotli || echo \"\"brotli not found\"\" AUTH_TOKEN=''eyJhbGciOiJFZERTQSJ9.eyJpYXQiOjE3NjQ1NjIxNDEsImV4cCI6MTc3MjMzODE0MSwidXNlcl9pZCI6IjY0ODM1OTE5LWI4M2QtNDg2NS1iNGRhLWZlZTRhOTRhYzYwZiIsInNlc3Npb25faWQiOiJlZTkxYmQyNi02ZmMwLTRjNDMtOTliOC03YTdiNmIyNGRiNTQiLCJ0eXBlIjoiVVNFUiIsImNsaWVudF90eXBlIjoiV0VCIn0.n8Sfc-t1GT3jKvnCD4bjnet6RzOw9Bw_6E88I5_XH9fqozDNW877_M1UE1RvgdLtDIXLXolkthN4aKWssUoQBg'' curl -sL \"\"https://api.viewstats.com/videos/s3AWPNLeUlU\"\" \\\\ -H \"\"Authorization: Bearer $AUTH_TOKEN\"\" \\\\ -H \"\"Accept: application/json\"\" \\\\ -H \"\"Accept-Encoding: br\"\" \\\\ | brotli -d)",
+      "Bash(brotli:*)",
+      "WebFetch(domain:wiki.sponsor.ajay.app)",
+      "Bash(grep:*)",
+      "Bash(# Search for decryption/decoding in chunks grep -oiE ''\\(decrypt|decode|decompress|inflate|unpack|parse\\)[^}]{0,80}'' /tmp/*.js)",
+      "Bash(# Look for fetchDecryptData which we saw earlier grep -oE ''.{0,100}fetchDecryptData.{0,100}'' /tmp/*.js)",
+      "Bash(# Download the chunk that likely contains the fetch utilities curl -s \"\"https://www.viewstats.com/_next/static/chunks/60273-9485dcbd7af87748.js\"\" # Search for decrypt/fetch patterns grep -oiE ''\\(fetchDecrypt|DecryptData|apiUrl|API_URL|getApiBase\\)[^}]{0,100}'' /tmp/chunk-60273.js)",
+      "Bash(# Search for the S\\(\\) function that returns API URL grep -oE ''function [A-Za-z]\\\\\\(\\\\\\)\\\\{return\"\"https[^}]+\\\\}'' /tmp/*.js)",
+      "Bash(# Look at how the video page imports and uses fetchDecryptData # Find the function definition by searching for export patterns grep -oE ''export.{0,30}\\(fetchDecryptData|DecryptData\\)'' /tmp/*.js # Or search for the assignment grep -oE ''\\(fetchDecryptData|DecryptData\\)\\\\s*='' /tmp/*.js)",
+      "Bash(# Get the shared chunk that contains the data fetching logic curl -s \"\"https://www.viewstats.com/_next/static/chunks/85019-be134aecc3252183.js\"\" grep -oE ''\\(async function|const\\).{0,50}\\(decrypt|Decrypt\\)[^}]*\\\\{[^}]{0,300}'' /tmp/chunk-85019.js)",
+      "Bash(# Search all downloaded JS for decrypt patterns grep -rn \"\"decrypt\"\" /tmp/*.js)",
+      "Bash(# Look for subtle.crypto or WebCrypto API usage grep -oE ''crypto\\\\.subtle|SubtleCrypto|importKey|deriveBits'' /tmp/*.js)"
     ]
   }
 }

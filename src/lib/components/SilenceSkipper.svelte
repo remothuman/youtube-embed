@@ -4,11 +4,14 @@
 	import { browser } from '$app/environment';
 	import { page } from '$app/stores';
 	import {
-		playerStore,
+		currentTime,
+		playerState,
+		duration as durationStore,
 		seekTo,
 		setPlayerPlaybackRate,
 		getPlayerPlaybackRate
 	} from '$lib/stores/playerStore';
+	import { canSeek, markSeek } from '$lib/stores/seekLock';
 	import { sendAnalyticsEvent } from '$lib/analytics';
 	import { isToolActive, updateToolsParam } from '$lib/utils/videoToolsParams';
 	import { SILENCE_API_URL } from '$lib/config';
@@ -35,17 +38,32 @@
 
 	// UI state
 	let enabled = $state(false);
-	let isPolling = $state(false);
 
 	// Skip state for speed mode
 	let inSilence = $state(false);
 	let originalRate = $state(1);
 
-	// Track recently skipped segment to prevent re-triggering
-	let recentlySkippedEndMs = $state<number | null>(null);
+	// Track recently skipped segment by ID to prevent re-triggering
+	let recentlySkippedSegmentId = $state<string | null>(null);
 
 	// Debounce tracking for analytics
 	let lastSkipTime = 0;
+
+	// Reset state when video changes
+	$effect(() => {
+		videoId; // Track videoId
+		return () => {
+			// Cleanup on videoId change
+			$submitMutation.reset();
+			recentlySkippedSegmentId = null;
+			// Clear old query data for this video
+			queryClient.removeQueries({ queryKey: ['silence-status'] });
+			if (inSilence) {
+				setPlayerPlaybackRate(originalRate);
+				inSilence = false;
+			}
+		};
+	});
 
 	// Validate settings from localStorage
 	function validateSettings(data: unknown): SilenceSettings {
@@ -93,12 +111,10 @@
 	});
 
 	onDestroy(() => {
-		// Reset playback rate if we were in speed mode
-		if (inSilence) {
-			setPlayerPlaybackRate(originalRate);
+		// Always try to restore if in speed mode and rate is 2x
+		if (settings.mode === 'speed' && (inSilence || getPlayerPlaybackRate() === 2)) {
+			setPlayerPlaybackRate(originalRate || 1);
 		}
-		// Ensure polling stops
-		isPolling = false;
 	});
 
 	// Save settings to localStorage
@@ -107,6 +123,28 @@
 			localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
 		}
 	}
+
+	// Status polling query - uses data to control polling (not external state)
+	const statusQuery = createQuery({
+		queryKey: ['silence-status', videoId],
+		queryFn: async (): Promise<SilenceResponse> => {
+			const res = await fetch(`${SILENCE_API_URL}/silence/status?v=${videoId}`);
+			if (!res.ok) throw new Error('Failed to fetch status');
+			return res.json();
+		},
+		enabled: false, // Manually triggered via refetch()
+		refetchInterval: (query) => {
+			const data = query.state.data;
+			if (!data) return false; // Not started yet
+			// Stop polling when completed, cached, failed, or not_found
+			if (data.status === 'completed' || data.status === 'cached' ||
+			    data.status === 'failed' || data.status === 'not_found') {
+				return false;
+			}
+			// Poll every 2s while queued or processing
+			return 2000;
+		}
+	});
 
 	// Submit video for processing
 	const submitMutation = createMutation({
@@ -119,121 +157,97 @@
 			return res.json() as Promise<SilenceResponse>;
 		},
 		onSuccess: (data) => {
-			if (data.status === 'cached' || data.status === 'completed') {
-				// Got segments immediately
-				queryClient.setQueryData(['silence', videoId], data);
-				isPolling = false;
-			} else if (data.status === 'queued' || data.status === 'processing') {
-				// Need to poll for status
-				isPolling = true;
+			if (data.status === 'queued' || data.status === 'processing') {
 				sendAnalyticsEvent('silenceQueueJoined');
+				// Seed the status query with initial data and start polling
+				queryClient.setQueryData(['silence-status', videoId], data);
+				$statusQuery.refetch();
 			}
+			// For cached/completed, mutation data is enough - no polling needed
 		}
 	});
 
-	// Poll for status while processing
-	const statusQuery = createQuery({
-		queryKey: ['silence-status', videoId],
-		queryFn: async (): Promise<SilenceResponse> => {
-			const res = await fetch(`${SILENCE_API_URL}/silence/status?v=${videoId}`);
-			if (!res.ok) throw new Error('Failed to fetch status');
-			return res.json();
-		},
-		refetchInterval: (query) => {
-			const data = query.state.data;
-			if (data?.status === 'queued' || data?.status === 'processing') {
-				return 2000; // Poll every 2 seconds
-			}
-			return false; // Stop polling
-		},
-		enabled: isPolling
-	});
-
-	// When status changes to completed, stop polling and store result
-	$effect(() => {
-		if ($statusQuery.data?.status === 'completed' || $statusQuery.data?.status === 'cached') {
-			queryClient.setQueryData(['silence', videoId], $statusQuery.data);
-			isPolling = false;
-		} else if ($statusQuery.data?.status === 'failed') {
-			isPolling = false;
-		}
-	});
-
-	// Main query for cached/completed results
-	const silenceQuery = createQuery({
-		queryKey: ['silence', videoId],
-		queryFn: async (): Promise<SilenceResponse> => {
-			// This is a placeholder - data is set by mutation/status query
-			const res = await fetch(`${SILENCE_API_URL}/silence/status?v=${videoId}`);
-			if (!res.ok) throw new Error('Failed to fetch status');
-			return res.json();
-		},
-		enabled: false, // Only populated via setQueryData
-		staleTime: Infinity
-	});
-
-	// Get current response data
-	let responseData = $derived($silenceQuery.data ?? $statusQuery.data ?? $submitMutation.data);
+	// Get current response data - prefer status query data when available
+	let responseData = $derived($statusQuery.data ?? $submitMutation.data);
 	let segments = $derived(responseData?.segments ?? null);
 	let status = $derived(responseData?.status ?? 'not_found');
 	let queuePosition = $derived(responseData?.position);
 
-	// Filter segments by user settings
-	function getFilteredSegments(): SilenceSegment[] {
+	// Filter segments by user settings - memoized to avoid recomputing on every time update
+	let filteredSegments = $derived.by(() => {
 		if (!segments) return [];
-		return segments.filter((seg) => seg.duration_ms >= settings.minSkipMs);
-	}
+		const { timeBeforeSkipping, timeAfterSkipping, minSkipMs } = settings;
+		const minMargins = timeBeforeSkipping + timeAfterSkipping;
+		return segments.filter(
+			(seg) => seg.duration_ms >= minSkipMs && seg.duration_ms > minMargins
+		);
+	});
 
-	// Skip/Speed logic - runs on time updates
+	// Find current segment - derived to avoid repeated computation
+	let currentSegment = $derived.by(() => {
+		if (!enabled || !filteredSegments.length) return null;
+		const currentMs = $currentTime * 1000;
+		const { timeBeforeSkipping, timeAfterSkipping } = settings;
+		return filteredSegments.find((seg) => {
+			const actionStart = seg.start_ms + timeBeforeSkipping;
+			const actionEnd = seg.end_ms - timeAfterSkipping;
+			return currentMs >= actionStart && currentMs < actionEnd;
+		}) ?? null;
+	});
+
+	// Skip mode: seek past silence segments
 	$effect(() => {
-		if (!enabled || !segments?.length) {
-			if (inSilence) {
+		if (!enabled || settings.mode !== 'skip' || !currentSegment) return;
+
+		const segmentId = `${currentSegment.start_ms}-${currentSegment.end_ms}`;
+		if (segmentId === recentlySkippedSegmentId || !canSeek()) return;
+
+		const skipEndMs = currentSegment.end_ms - settings.timeAfterSkipping;
+		const didSeek = seekTo(skipEndMs / 1000);
+		if (didSeek) {
+			markSeek();
+			recentlySkippedSegmentId = segmentId;
+			trackSkip();
+			setTimeout(() => {
+				recentlySkippedSegmentId = null;
+			}, 2000);
+		}
+	});
+
+	// Speed mode: track segment entry/exit without reactive loops
+	// Use $effect.pre to run before DOM updates, read currentSegment, compare with local tracking
+	let wasInSegment = false;
+	$effect(() => {
+		if (!enabled || settings.mode !== 'speed') {
+			// Cleanup: restore rate if we were in silence
+			if (wasInSegment) {
 				setPlayerPlaybackRate(originalRate);
+				wasInSegment = false;
 				inSilence = false;
 			}
 			return;
 		}
 
-		const currentMs = $playerStore.currentTime * 1000;
-		const { mode, timeBeforeSkipping, timeAfterSkipping } = settings;
-		const validSegments = getFilteredSegments();
+		const nowInSegment = currentSegment !== null;
 
-		// Find if we're in a silence segment (with margins applied)
-		const inSegment = validSegments.find((seg) => {
-			const actionStart = seg.start_ms + timeBeforeSkipping;
-			const actionEnd = seg.end_ms - timeAfterSkipping;
-			return currentMs >= actionStart && currentMs < actionEnd;
-		});
-
-		if (mode === 'skip' && inSegment) {
-			// Check if we already skipped this segment (prevent re-triggering)
-			const skipEndMs = inSegment.end_ms - timeAfterSkipping;
-			if (skipEndMs !== recentlySkippedEndMs) {
-				recentlySkippedEndMs = skipEndMs;
-				seekTo(skipEndMs / 1000);
-				trackSkip();
-				// Clear after a short delay to allow skipping same segment if user seeks back
-				setTimeout(() => {
-					recentlySkippedEndMs = null;
-				}, 1000);
-			}
-		} else if (mode === 'speed') {
-			if (inSegment && !inSilence) {
-				// Entering silence - speed up
-				inSilence = true;
-				originalRate = getPlayerPlaybackRate();
-				setPlayerPlaybackRate(2);
-			} else if (!inSegment && inSilence) {
-				// Exiting silence - restore speed
-				inSilence = false;
-				setPlayerPlaybackRate(originalRate);
-			}
+		if (nowInSegment && !wasInSegment) {
+			// Entering silence - speed up
+			wasInSegment = true;
+			inSilence = true;
+			originalRate = getPlayerPlaybackRate();
+			setPlayerPlaybackRate(2);
+		} else if (!nowInSegment && wasInSegment) {
+			// Exiting silence - restore speed
+			wasInSegment = false;
+			inSilence = false;
+			setPlayerPlaybackRate(originalRate);
 		}
 	});
 
-	// Reset speed state on pause/seek
+	// Reset speed state on pause
 	$effect(() => {
-		if ($playerStore.state !== 'playing' && inSilence) {
+		if ($playerState !== 'playing' && inSilence) {
+			wasInSegment = false;
 			inSilence = false;
 			setPlayerPlaybackRate(originalRate);
 		}
@@ -256,8 +270,8 @@
 			updateToolsParam($page.url, 'silence', true);
 
 			// Submit for processing if we have duration
-			if ($playerStore.duration > 0) {
-				$submitMutation.mutate({ videoId, duration: $playerStore.duration });
+			if ($durationStore > 0) {
+				$submitMutation.mutate({ videoId, duration: $durationStore });
 			}
 		} else {
 			sendAnalyticsEvent('toolDisabled', 'silence');
@@ -272,8 +286,8 @@
 	}
 
 	function handleRetry() {
-		if ($playerStore.duration > 0) {
-			$submitMutation.mutate({ videoId, duration: $playerStore.duration });
+		if ($durationStore > 0) {
+			$submitMutation.mutate({ videoId, duration: $durationStore });
 		}
 	}
 
@@ -281,12 +295,12 @@
 	$effect(() => {
 		if (
 			enabled &&
-			$playerStore.duration > 0 &&
+			$durationStore > 0 &&
 			!$submitMutation.isPending &&
 			!$submitMutation.isSuccess &&
 			status === 'not_found'
 		) {
-			$submitMutation.mutate({ videoId, duration: $playerStore.duration });
+			$submitMutation.mutate({ videoId, duration: $durationStore });
 		}
 	});
 
@@ -303,7 +317,7 @@
 	}
 
 	// Video duration for active UI
-	let videoDuration = $derived(responseData?.duration_sec ?? $playerStore.duration);
+	let videoDuration = $derived(responseData?.duration_sec ?? $durationStore);
 
 	// Whether to show active UI
 	let isReady = $derived(enabled && (status === 'completed' || status === 'cached') && segments !== null);

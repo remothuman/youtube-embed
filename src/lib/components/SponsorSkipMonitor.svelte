@@ -2,6 +2,7 @@
 	import { onMount, onDestroy } from 'svelte';
 	import { createQuery } from '@tanstack/svelte-query';
 	import { playerStore, seekTo } from '$lib/stores/playerStore';
+	import { canSeek, markSeek } from '$lib/stores/seekLock';
 	import { currentSponsorSegment, registerSkipCallback, unregisterSkipCallback } from '$lib/stores/sponsorStore';
 	import { sponsorSettings } from '$lib/stores/sponsorSettingsStore';
 	import { sendAnalyticsEvent } from '$lib/analytics';
@@ -87,15 +88,18 @@
 			return currentSec >= start && currentSec < end - 0.1;
 		});
 
-		if ($sponsorSettings.mode === 'auto' && inSegment && !recentlySkipped.has(inSegment.UUID)) {
+		if ($sponsorSettings.mode === 'auto' && inSegment && !recentlySkipped.has(inSegment.UUID) && canSeek()) {
 			const [, end] = inSegment.segment;
-			recentlySkipped.add(inSegment.UUID);
-			seekTo(end);
-			trackAutoSkip();
-			setTimeout(() => {
-				recentlySkipped.delete(inSegment.UUID);
-				recentlySkipped = recentlySkipped;
-			}, 2000);
+			const didSeek = seekTo(end);
+			if (didSeek) {
+				markSeek();
+				recentlySkipped.add(inSegment.UUID);
+				trackAutoSkip();
+				setTimeout(() => {
+					recentlySkipped.delete(inSegment.UUID);
+					recentlySkipped = recentlySkipped;
+				}, 2000);
+			}
 			currentSegmentForSkip = null;
 			currentSponsorSegment.set(null);
 		} else {

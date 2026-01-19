@@ -9,7 +9,8 @@ import os
 from contextlib import contextmanager
 from typing import Optional
 
-DATABASE_PATH = os.environ.get("DATABASE_PATH", "/data/silence.db")
+# Default to local ./data for dev, Railway sets DATABASE_PATH=/data/silence.db
+DATABASE_PATH = os.environ.get("DATABASE_PATH", "./data/silence.db")
 
 
 def get_db_path() -> str:

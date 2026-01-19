@@ -74,8 +74,10 @@ export function unregisterPlayerActions(): void {
 	playerActions = null;
 }
 
-export function seekTo(seconds: number): void {
-	playerActions?.seekTo(seconds);
+export function seekTo(seconds: number): boolean {
+	if (!playerActions) return false;
+	playerActions.seekTo(seconds);
+	return true;
 }
 
 export function setPlayerPlaybackRate(rate: number): void {
