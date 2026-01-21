@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { SilenceSegment, SilenceSettings } from '$lib/types/silence';
+	import type { SilenceSegment, SilenceSettings } from './types';
 
 	interface Props {
 		settings: SilenceSettings;

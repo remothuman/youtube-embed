@@ -11,9 +11,9 @@
 		setPlayerPlaybackRate,
 		getPlayerPlaybackRate
 	} from '$lib/stores/playerStore';
-	import { canSeek, markSeek } from '$lib/stores/seekLock';
+	import { canSeek, markSeek } from '$lib/features/shared/seekLock';
 	import { sendAnalyticsEvent } from '$lib/analytics.svelte';
-	import { isToolActive, updateToolsParam } from '$lib/utils/videoToolsParams';
+	import { isToolActive, updateToolsParam } from '$lib/features/shared/videoToolsParams';
 	import { SILENCE_API_URL } from '$lib/config';
 	import {
 		type SilenceSegment,
@@ -21,7 +21,7 @@
 		type SilenceResponse,
 		DEFAULT_SETTINGS,
 		STORAGE_KEY
-	} from '$lib/types/silence';
+	} from './types';
 	import SilenceSkipperActive from './SilenceSkipperActive.svelte';
 
 	interface Props {

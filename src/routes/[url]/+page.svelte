@@ -6,10 +6,8 @@
 	import { runAnalyticsVideoPage, sendAnalyticsEvent } from '$lib/analytics.svelte';
 	import YouTubePlayer from '$lib/components/YouTubePlayer.svelte';
 	import VideoTools from '$lib/components/VideoTools.svelte';
-	import SponsorSkip from '$lib/components/SponsorSkip.svelte';
-	import SponsorSkipMonitor from '$lib/components/SponsorSkipMonitor.svelte';
-	import SponsorSkipButton from '$lib/components/SponsorSkipButton.svelte';
-	import SilenceSkipper from '$lib/components/SilenceSkipper.svelte';
+	import { SponsorSkip, SponsorSkipMonitor, SponsorSkipButton } from '$lib/features/sponsor-skip';
+	import { SilenceSkipper } from '$lib/features/silence-skipper';
 
 	let videoId = $page.url.searchParams.get('v') as string; 
 	

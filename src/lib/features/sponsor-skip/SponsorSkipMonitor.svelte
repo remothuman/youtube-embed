@@ -2,11 +2,11 @@
 	import { onMount, onDestroy } from 'svelte';
 	import { createQuery } from '@tanstack/svelte-query';
 	import { playerStore, seekTo } from '$lib/stores/playerStore';
-	import { canSeek, markSeek } from '$lib/stores/seekLock';
-	import { currentSponsorSegment, registerSkipCallback, unregisterSkipCallback } from '$lib/stores/sponsorStore';
-	import { sponsorSettings } from '$lib/stores/sponsorSettingsStore';
+	import { canSeek, markSeek } from '$lib/features/shared/seekLock';
+	import { currentSponsorSegment, registerSkipCallback, unregisterSkipCallback } from './sponsorStore';
+	import { sponsorSettings } from './sponsorSettingsStore';
 	import { sendAnalyticsEvent } from '$lib/analytics.svelte';
-	import { type SponsorSegment, ALL_CATEGORIES } from '$lib/types/sponsorBlock';
+	import { type SponsorSegment, ALL_CATEGORIES } from './types';
 
 	interface Props {
 		videoId: string;

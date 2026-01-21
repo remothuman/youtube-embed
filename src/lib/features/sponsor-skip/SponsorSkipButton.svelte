@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { currentSponsorSegment, triggerSkip } from '$lib/stores/sponsorStore';
-	import { CATEGORY_LABELS } from '$lib/types/sponsorBlock';
+	import { currentSponsorSegment, triggerSkip } from './sponsorStore';
+	import { CATEGORY_LABELS } from './types';
 
 	// Read segment from store
 	let segment = $derived($currentSponsorSegment);

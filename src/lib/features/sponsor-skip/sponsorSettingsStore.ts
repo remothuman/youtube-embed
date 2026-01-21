@@ -7,7 +7,7 @@ import {
 	DEFAULT_SETTINGS,
 	DEFAULT_ENABLED_CATEGORIES,
 	STORAGE_KEY
-} from '$lib/types/sponsorBlock';
+} from './types';
 
 function validateSettings(data: unknown): SponsorBlockSettings {
 	if (typeof data !== 'object' || data === null) return { ...DEFAULT_SETTINGS };

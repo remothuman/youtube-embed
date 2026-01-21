@@ -4,7 +4,7 @@
 		type SponsorCategory,
 		ALL_CATEGORIES,
 		CATEGORY_LABELS
-	} from '$lib/types/sponsorBlock';
+	} from './types';
 
 	interface Props {
 		settings: SponsorBlockSettings;

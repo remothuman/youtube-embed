@@ -1,5 +1,5 @@
 import { writable } from 'svelte/store';
-import type { SponsorSegment } from '$lib/types/sponsorBlock';
+import type { SponsorSegment } from './types';
 
 // Current sponsor segment to skip (for manual mode overlay button)
 // null = not in a sponsor segment
