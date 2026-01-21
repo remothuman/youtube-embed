@@ -3,7 +3,7 @@
 	import { createQuery } from '@tanstack/svelte-query';
 	import { onMount } from 'svelte';
 	import ViewsLikesDislikes from './ViewsLikesDislikes.svelte';
-	import { sendAnalyticsEvent } from '$lib/analytics';
+	import { runAnalyticsVideoPage, sendAnalyticsEvent } from '$lib/analytics.svelte';
 	import YouTubePlayer from '$lib/components/YouTubePlayer.svelte';
 	import VideoTools from '$lib/components/VideoTools.svelte';
 	import SponsorSkip from '$lib/components/SponsorSkip.svelte';
@@ -32,18 +32,7 @@
     $: title = $query.data?.title
 
     // video url is hashed for user privacy
-	onMount(() => {
-		sendAnalyticsEvent("loadedVideoPage");
-		setTimeout(() => {
-			sendAnalyticsEvent("stayedOnVideoPageFor1Min")
-		}, 1000 * 60)
-		setTimeout(() => {
-			sendAnalyticsEvent("stayedOnVideoPageFor5Min")
-		}, 1000 * 60 * 5)
-		setTimeout(() => {
-			sendAnalyticsEvent("stayedOnVideoPageFor10Min")
-		}, 1000 * 60 * 10)
-	})
+	runAnalyticsVideoPage();
 </script>
 
 <main class="max-w-5xl mx-auto p-2">
@@ -55,7 +44,7 @@
 	</div>
     <h1 class="text-xl font-bold">
         {#if $query.isLoading}
-		    Loading Title...
+            Loading Title...
         {:else if $query.isError}
             <!-- Error fetching title: {$query.error.message} -->
         {:else if $query.isSuccess}

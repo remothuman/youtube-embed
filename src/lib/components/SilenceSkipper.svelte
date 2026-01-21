@@ -12,7 +12,7 @@
 		getPlayerPlaybackRate
 	} from '$lib/stores/playerStore';
 	import { canSeek, markSeek } from '$lib/stores/seekLock';
-	import { sendAnalyticsEvent } from '$lib/analytics';
+	import { sendAnalyticsEvent } from '$lib/analytics.svelte';
 	import { isToolActive, updateToolsParam } from '$lib/utils/videoToolsParams';
 	import { SILENCE_API_URL } from '$lib/config';
 	import {

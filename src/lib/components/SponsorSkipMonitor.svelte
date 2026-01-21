@@ -5,7 +5,7 @@
 	import { canSeek, markSeek } from '$lib/stores/seekLock';
 	import { currentSponsorSegment, registerSkipCallback, unregisterSkipCallback } from '$lib/stores/sponsorStore';
 	import { sponsorSettings } from '$lib/stores/sponsorSettingsStore';
-	import { sendAnalyticsEvent } from '$lib/analytics';
+	import { sendAnalyticsEvent } from '$lib/analytics.svelte';
 	import { type SponsorSegment, ALL_CATEGORIES } from '$lib/types/sponsorBlock';
 
 	interface Props {

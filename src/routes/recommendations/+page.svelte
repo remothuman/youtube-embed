@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { sendAnalyticsEvent } from "$lib/analytics";
+	import { sendAnalyticsEvent } from "$lib/analytics.svelte";
 	import { onMount } from "svelte";
 
 

@@ -1,4 +1,5 @@
 import { browser} from '$app/environment';
+import { onMount } from 'svelte';
 
 
 // todo: add posthog maybe, can keep redaction (https://posthog.com/tutorials/web-redact-properties)
@@ -107,3 +108,19 @@ Will send an event when:
     - user loads homepage
     - user loads recommendations page
 */
+
+export function runAnalyticsVideoPage() {
+    onMount(() => {
+		sendAnalyticsEvent("loadedVideoPage");
+		setTimeout(() => {
+			sendAnalyticsEvent("stayedOnVideoPageFor1Min")
+		}, 1000 * 60)
+		setTimeout(() => {
+			sendAnalyticsEvent("stayedOnVideoPageFor5Min")
+		}, 1000 * 60 * 5)
+		setTimeout(() => {
+			sendAnalyticsEvent("stayedOnVideoPageFor10Min")
+		}, 1000 * 60 * 10)
+	})
+}
+    

@@ -3,7 +3,7 @@
 
 	// import SearchBar from "./SearchBar.svelte";
     import IconLinks from "./IconLinks.svelte"
-	import { sendAnalyticsEvent } from "$lib/analytics";
+	import { sendAnalyticsEvent } from "$lib/analytics.svelte";
 
 
 	onMount(() => {

@@ -40,7 +40,8 @@
       "Bash(# Look at how the video page imports and uses fetchDecryptData # Find the function definition by searching for export patterns grep -oE ''export.{0,30}\\(fetchDecryptData|DecryptData\\)'' /tmp/*.js # Or search for the assignment grep -oE ''\\(fetchDecryptData|DecryptData\\)\\\\s*='' /tmp/*.js)",
       "Bash(# Get the shared chunk that contains the data fetching logic curl -s \"\"https://www.viewstats.com/_next/static/chunks/85019-be134aecc3252183.js\"\" grep -oE ''\\(async function|const\\).{0,50}\\(decrypt|Decrypt\\)[^}]*\\\\{[^}]{0,300}'' /tmp/chunk-85019.js)",
       "Bash(# Search all downloaded JS for decrypt patterns grep -rn \"\"decrypt\"\" /tmp/*.js)",
-      "Bash(# Look for subtle.crypto or WebCrypto API usage grep -oE ''crypto\\\\.subtle|SubtleCrypto|importKey|deriveBits'' /tmp/*.js)"
+      "Bash(# Look for subtle.crypto or WebCrypto API usage grep -oE ''crypto\\\\.subtle|SubtleCrypto|importKey|deriveBits'' /tmp/*.js)",
+      "Bash(wc:*)"
     ]
   }
 }

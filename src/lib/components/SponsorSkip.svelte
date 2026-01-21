@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { createQuery } from '@tanstack/svelte-query';
 	import { sponsorSettings } from '$lib/stores/sponsorSettingsStore';
-	import { sendAnalyticsEvent } from '$lib/analytics';
+	import { sendAnalyticsEvent } from '$lib/analytics.svelte';
 	import { type SponsorBlockSettings, type SponsorSegment, ALL_CATEGORIES } from '$lib/types/sponsorBlock';
 	import SponsorSettings from './SponsorSettings.svelte';
 
