@@ -36,6 +36,7 @@
     - create community collaborative feeds of channels 
         - inspired by pockettube or by lists features of other apps
     - sign in with google to make sure it tracks your watch history...
+    - &list= in url 
     
 guidelines:
 - we want to make sure to keep everything minimal and following progressive disclosure, users who do not care about a feature should not have to think about feature

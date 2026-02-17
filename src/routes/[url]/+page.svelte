@@ -86,7 +86,7 @@
     {:else}
         <title>YT Embed - {videoId}</title>
     {/if}
-
+	<link rel="canonical" href="https://youtube.ttools.io/watch?v={videoId}" />
 	<!-- <meta name="description" content="Embedded Youtube Video of {title}"> -->
 	<!-- ^^ would use if had ssr. VV This does work.     Will edit as functionality is added of course -->
 	<meta name="description" content="Embedded Youtube Video of {videoId}. Includes dislike count. May bypass adblockblock">

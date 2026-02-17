@@ -73,6 +73,7 @@
 
 <svelte:head>
 	<title>Youtube Embed Viewer</title>
+	<link rel="canonical" href="https://youtube.ttools.io/" />
 	<meta
 		name="description"
 		content="View any youtube video as an embedded video, just add .ttools.io to the youtube url. Useful for when you want to watch with adblock. Also includes dislike count"
